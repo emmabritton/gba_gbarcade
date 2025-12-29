@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "resources",
+    "game"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Emma Britton <emmabritton@pm.me>"]
+description = "GBA Game Project Template"
+license-file = "LICENSE"
+repository = "https://github.com/emmabritton/?"
+readme = "README.md"
+keywords = ["games", "pixels", "retro", "gba"]
+categories = ["games"]
+publish = false
+
+[workspace.dependencies]
+agb = "0.22.6"
+
+[profile.dev]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false

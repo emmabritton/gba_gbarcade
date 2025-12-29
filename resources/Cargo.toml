@@ -1,0 +1,9 @@
+[package]
+name = "resources"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+edition.workspace = true
+
+[dependencies]
+agb.workspace = true
