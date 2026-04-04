@@ -2,23 +2,23 @@
 resolver = "2"
 members = [
     "resources",
-    "game"
+    "game",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 authors = ["Emma Britton <emmabritton@pm.me>"]
-description = "GBA Game Project Template"
+description = "Arcade/simple games for GBA"
 license-file = "LICENSE"
-repository = "https://github.com/emmabritton/?"
+repository = "https://github.com/emmabritton/gbarcade"
 readme = "README.md"
 keywords = ["games", "pixels", "retro", "gba"]
 categories = ["games"]
 publish = false
 
 [workspace.dependencies]
-agb = "0.22.6"
+agb = "0.23.1"
 
 [profile.dev]
 opt-level = 3

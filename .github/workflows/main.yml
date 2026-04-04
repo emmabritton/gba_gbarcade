@@ -15,7 +15,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-
   check:
     runs-on: ubuntu-latest
     steps:
@@ -46,10 +45,10 @@ jobs:
         run: cargo build --release
 
       - name: build gba
-        run: agb-gbafix target/thumbv4t-none-eabi/release/??? -o ???.gba -t??? -c??? -mEB -r010
+        run: agb-gbafix target/thumbv4t-none-eabi/release/gbarcade -o gbarcade_v0.1.0.gba -tGBArcade -cGAA1 -mEB -r10
 
       - uses: softprops/action-gh-release@v1
         with:
-          files: ???.gba
+          files: gbarcade_v0.1.0.gba
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
