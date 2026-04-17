@@ -71,7 +71,7 @@ fn run(mixer: Mixer, mut gfx: Graphics, mut button_controller: ButtonController)
             scene = match action {
                 SceneAction::Menu => Scene::Menu(MenuState::new()),
                 SceneAction::Pipes(diff) => Scene::Pipes(PipesState::new(rng_seed, diff)),
-                SceneAction::Bricks => Scene::Bricks(BricksState::new()),
+                SceneAction::Bricks => Scene::Bricks(BricksState::new(rng_seed)),
                 SceneAction::Aster => Scene::Aster(AsterState::new(rng_seed)),
                 SceneAction::Sweeper(diff) => Scene::Sweeper(SweeperState::new(rng_seed, diff)),
                 SceneAction::Invaders => Scene::Invaders(InvadersState::new(rng_seed)),

@@ -1,14 +1,15 @@
 use crate::game_result::GameResult;
 use crate::gfx::background_stack;
+use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
 use crate::TILE_SIZE;
-use agb::display::object::Object;
+use agb::display::object::{Object, Sprite, Tag};
 use agb::display::tiled::RegularBackground;
 use agb::display::{GraphicsFrame, WIDTH};
-use agb::fixnum::{vec2, Rect, Vector2D};
+use agb::fixnum::{vec2, Num, Rect, Vector2D};
 use agb::input::{Button, ButtonController};
-use agb::println;
+use agb::rng::RandomNumberGenerator;
 use alloc::vec;
 use alloc::vec::Vec;
 use resources::sprites::{
@@ -17,6 +18,9 @@ use resources::sprites::{
 };
 use resources::{bg, sprites};
 
+type Fp = Num<i32, 8>;
+
+const PADDLE_SPEED: i32 = 4;
 const PADDLE_Y: i32 = 149;
 const BOUNDS: Rect<i32> = Rect {
     position: vec2(2, 11),
@@ -24,15 +28,40 @@ const BOUNDS: Rect<i32> = Rect {
 };
 const FLIP_OFFSET: Vector2D<i32> = vec2(16, 0);
 const BALL_SIZE: Vector2D<i32> = vec2(4, 4);
-const BRICK_OFFSET: Vector2D<i32> = vec2(3, 3);
+const BRICK_OFFSET: Vector2D<i32> = vec2(2, 3);
 
+const LIFE_COUNT: i32 = 8;
 const LIFE_Y: i32 = 4;
-const LIFE_X0: i32 = WIDTH - (LIFE_STRIDE * 3);
 const LIFE_STRIDE: i32 = 8;
 
 const SERVE_OFFSET: Vector2D<i32> = vec2(80, 120);
 
-#[derive(Debug)]
+const LEVEL_BADGE: &Tag = &sprites::BRICKS_LEVEL;
+const LEVEL_NUMS: &Tag = &sprites::BRICKS_LVL_NUM;
+
+const LVL_BADGE_OFFSET: Vector2D<i32> = vec2(70, 90);
+const LVL_NUM_OFFSET: Vector2D<i32> = vec2(152, 90);
+
+const EXTRA_LIFE_FRAMES: u16 = 1800;
+const EXTRA_LIFE_SIZE: Vector2D<i32> = vec2(32, 16);
+const MAX_LIVES: u8 = 16;
+
+// Ball speed per level 
+const BALL_SPEEDS: [Fp; 9] = [
+    Num::from_raw(256), Num::from_raw(307), Num::from_raw(358),
+    Num::from_raw(409), Num::from_raw(460), Num::from_raw(512),
+    Num::from_raw(563), Num::from_raw(614), Num::from_raw(665),
+];
+
+// Spawn probabilities for extra life brick
+const EXTRA_LIFE_DENOMS: [u16; 15] = [
+    1000, 2357, 3714, 5071, 6428, 7785, 9142, 10500,
+    11857, 13214, 14571, 15928, 17285, 18642, 20000,
+];
+
+const EXTRA_LIFE: &Sprite = sprites::BRICKS_EXTRA_LIFE.sprite(0);
+
+#[derive(Debug, Clone, Copy)]
 enum BrickKind {
     Blue,
     Green,
@@ -72,51 +101,63 @@ struct Brick {
 pub struct BricksState {
     paddle_len: usize,
     paddle_x: i32,
-    ball_pos: Vector2D<i32>,
+    ball_pos: Vector2D<Fp>,
     ball_vel: Vector2D<i32>,
     launched: bool,
     bricks: Vec<Brick>,
+    empty_slots: Vec<Vector2D<i32>>,
     backgrounds: [RegularBackground; 1],
     brick_objs: [Object; 5],
     flipped_brick_objs: [Object; 5],
     ball_obj: Object,
+    extra_life_obj: Object,
     paddle_cap_objs: [Object; 2],
     lives: u8,
+    level: u8,
+    show_level_badge: bool,
+    extra_life: Option<(Rect<i32>, u16)>,
+    rng: RandomNumberGenerator,
     game_result: Option<GameResult>,
 }
 
-fn make_bricks() -> Vec<Brick> {
-    let mut bricks = vec![];
+// Row order: index 0 = top row (smallest y on screen), index 4 = bottom row.
+// Level spec is bottom-to-top, so rows[y] = spec[4 - y].
+fn make_bricks(level: u8) -> Vec<Brick> {
+    let rows: [BrickKind; 5] = match level {
+        1 => [BrickKind::Blue, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue],
+        2 => [BrickKind::Green, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue],
+        3 => [BrickKind::Yellow, BrickKind::Green, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue],
+        4 => [BrickKind::Orange, BrickKind::Yellow, BrickKind::Green, BrickKind::Blue, BrickKind::Blue],
+        5 => [BrickKind::Red, BrickKind::Orange, BrickKind::Yellow, BrickKind::Green, BrickKind::Blue],
+        6 => [BrickKind::Red, BrickKind::Red, BrickKind::Orange, BrickKind::Yellow, BrickKind::Green],
+        7 => [BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Orange, BrickKind::Yellow],
+        8 => [BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Orange],
+        9 => [BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Red],
+        _ => unreachable!(),
+    };
 
+    let mut bricks = vec![];
     for y in 0..5 {
-        for x in 0..10 {
-            let kind = match y {
-                0 => BrickKind::Red,
-                1 => BrickKind::Orange,
-                2 => BrickKind::Yellow,
-                3 => BrickKind::Green,
-                4 => BrickKind::Blue,
-                _ => unreachable!(),
-            };
+        for x in 0..6 {
             let rect = Rect::new(
                 vec2(
                     BOUNDS.position.x + x * 40 + BRICK_OFFSET.x,
-                    BOUNDS.position.y + y * 12 + BRICK_OFFSET.y,
+                    BOUNDS.position.y + y as i32 * 13 + BRICK_OFFSET.y,
                 ),
                 vec2(32, 10),
             );
-            bricks.push(Brick { kind, rect });
+            bricks.push(Brick { kind: rows[y], rect });
         }
     }
-
     bricks
 }
 
 impl BricksState {
-    pub fn new() -> Self {
+    pub fn new(seed: [u32; 4]) -> Self {
         let backgrounds = background_stack([&bg::bg_brick_break]);
 
         let ball_obj = Object::new(BRICK_BALL.sprite(0));
+        let extra_life_obj = Object::new(EXTRA_LIFE);
 
         let brick_objs = [
             Object::new(BRICK_BLUE.sprite(0)),
@@ -146,23 +187,29 @@ impl BricksState {
         let paddle_x = 140;
         let paddle_w = (1 + 2) * TILE_SIZE;
         let ball_pos = vec2(
-            paddle_x + paddle_w / 2 - BALL_SIZE.x / 2,
-            PADDLE_Y - BALL_SIZE.y,
+            Fp::from(paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1)),
+            Fp::from(PADDLE_Y - BALL_SIZE.y),
         );
 
         Self {
             ball_obj,
-            paddle_len: 1,
+            extra_life_obj,
+            paddle_len: 3,
             paddle_x,
             ball_pos,
             ball_vel: vec2(1, -1),
             launched: false,
-            bricks: make_bricks(),
+            bricks: make_bricks(1),
+            empty_slots: vec![],
             backgrounds,
             brick_objs,
             flipped_brick_objs,
             paddle_cap_objs,
-            lives: 3,
+            lives: LIFE_COUNT as u8,
+            level: 1,
+            show_level_badge: true,
+            extra_life: None,
+            rng: RandomNumberGenerator::new_with_seed(seed),
             game_result: None,
         }
     }
@@ -170,7 +217,14 @@ impl BricksState {
 
 impl BricksState {
     fn ball_rect(&self) -> Rect<i32> {
-        Rect::new(self.ball_pos, BALL_SIZE)
+        Rect::new(
+            vec2(self.ball_pos.x.floor(), self.ball_pos.y.floor()),
+            BALL_SIZE,
+        )
+    }
+
+    fn ball_speed(&self) -> Fp {
+        BALL_SPEEDS[(self.level - 1) as usize]
     }
 
     fn paddle_rect(&self) -> Rect<i32> {
@@ -203,46 +257,40 @@ impl BricksState {
 
         let max_x = BOUNDS.bottom_right().x - ((self.paddle_len as i32 + 2) * TILE_SIZE);
         if button_controller.is_pressed(Button::Left) {
-            self.paddle_x = self.paddle_x.saturating_sub(2);
+            self.paddle_x = self.paddle_x.saturating_sub(PADDLE_SPEED);
         }
         if button_controller.is_pressed(Button::Right) {
-            self.paddle_x = self.paddle_x.saturating_add(2);
+            self.paddle_x = self.paddle_x.saturating_add(PADDLE_SPEED);
         }
         self.paddle_x = self.paddle_x.clamp(BOUNDS.position.x, max_x);
 
         if !self.launched {
             let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
-            self.ball_pos.x = self.paddle_x + paddle_w / 2 - BALL_SIZE.x / 2;
-            self.ball_pos.y = PADDLE_Y - BALL_SIZE.y;
+            self.ball_pos.x = Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
+            self.ball_pos.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
             if button_controller.is_just_pressed(Button::A) {
                 self.launched = true;
+                self.show_level_badge = false;
             }
             return None;
         }
 
         let mut has_bounced = false;
         let mut hit_brick = false;
-        let prev_pos = self.ball_pos;
+        let prev_pos = vec2(self.ball_pos.x.floor(), self.ball_pos.y.floor());
 
-        self.ball_pos += self.ball_vel;
+        let speed = self.ball_speed();
+        self.ball_pos.x += Fp::from(self.ball_vel.x) * speed;
+        self.ball_pos.y += Fp::from(self.ball_vel.y) * speed;
 
         let ball_rect = self.ball_rect();
         let paddle_rect = self.paddle_rect();
         if self.ball_vel.y > 0 && paddle_rect.touches(ball_rect) {
-            self.ball_pos.y = paddle_rect.top_left().y - BALL_SIZE.y;
+            self.ball_pos.y = Fp::from(paddle_rect.top_left().y - BALL_SIZE.y);
 
-            let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
-            let paddle_center_x = self.paddle_x + paddle_w / 2;
-            let ball_center_x = self.ball_pos.x + BALL_SIZE.x / 2;
-            let rel = ball_center_x - paddle_center_x;
-
-            let mut vx = (rel * 2) / (paddle_w / 2).max(1);
-            if vx == 0 {
-                vx = if rel < 0 { -1 } else { 1 };
+            if next_u16_in(&mut self.rng, 0, 3) == 0 {
+                self.ball_vel.x = -self.ball_vel.x.abs();
             }
-            vx = vx.clamp(-2, 2);
-
-            self.ball_vel.x = vx;
             self.ball_vel.y = -self.ball_vel.y.abs();
             has_bounced = true;
         }
@@ -266,18 +314,18 @@ impl BricksState {
 
             if prev_rect.bottom_right().x <= brick_rect.top_left().x {
                 invert_x = true;
-                self.ball_pos.x = brick_rect.top_left().x - BALL_SIZE.x;
+                self.ball_pos.x = Fp::from(brick_rect.top_left().x - BALL_SIZE.x);
             } else if prev_rect.top_left().x >= brick_rect.bottom_right().x {
                 invert_x = true;
-                self.ball_pos.x = brick_rect.bottom_right().x;
+                self.ball_pos.x = Fp::from(brick_rect.bottom_right().x);
             }
 
             if prev_rect.bottom_right().y <= brick_rect.top_left().y {
                 invert_y = true;
-                self.ball_pos.y = brick_rect.top_left().y - BALL_SIZE.y;
+                self.ball_pos.y = Fp::from(brick_rect.top_left().y - BALL_SIZE.y);
             } else if prev_rect.top_left().y >= brick_rect.bottom_right().y {
                 invert_y = true;
-                self.ball_pos.y = brick_rect.bottom_right().y;
+                self.ball_pos.y = Fp::from(brick_rect.bottom_right().y);
             }
 
             if !invert_x && !invert_y {
@@ -309,16 +357,16 @@ impl BricksState {
                 if overlap_x < overlap_y {
                     invert_x = true;
                     if ball_mid.x < brick_mid.x {
-                        self.ball_pos.x -= overlap_x;
+                        self.ball_pos.x -= Fp::from(overlap_x);
                     } else {
-                        self.ball_pos.x += overlap_x;
+                        self.ball_pos.x += Fp::from(overlap_x);
                     }
                 } else {
                     invert_y = true;
                     if ball_mid.y < brick_mid.y {
-                        self.ball_pos.y -= overlap_y;
+                        self.ball_pos.y -= Fp::from(overlap_y);
                     } else {
-                        self.ball_pos.y += overlap_y;
+                        self.ball_pos.y += Fp::from(overlap_y);
                     }
                 }
             }
@@ -334,6 +382,7 @@ impl BricksState {
                 self.bricks[idx].kind = next;
                 sound_controller.play_sfx(SoundEffect::BrickDamage);
             } else {
+                self.empty_slots.push(brick_rect.position);
                 self.bricks.remove(idx);
                 sound_controller.play_sfx(SoundEffect::BrickBreak);
             }
@@ -345,21 +394,21 @@ impl BricksState {
         let top = BOUNDS.top_left().y;
         let bottom = BOUNDS.bottom_right().y;
 
-        if self.ball_pos.x < left {
-            self.ball_pos.x = left;
+        if self.ball_pos.x.floor() < left {
+            self.ball_pos.x = Fp::from(left);
             self.ball_vel.x *= -1;
             has_bounced = true;
-        } else if self.ball_pos.x + BALL_SIZE.x > right {
-            self.ball_pos.x = right - BALL_SIZE.x;
+        } else if self.ball_pos.x.floor() + BALL_SIZE.x > right {
+            self.ball_pos.x = Fp::from(right - BALL_SIZE.x);
             self.ball_vel.x *= -1;
             has_bounced = true;
         }
 
-        if self.ball_pos.y < top {
-            self.ball_pos.y = top;
+        if self.ball_pos.y.floor() < top {
+            self.ball_pos.y = Fp::from(top);
             self.ball_vel.y *= -1;
             has_bounced = true;
-        } else if self.ball_pos.y + BALL_SIZE.y > bottom {
+        } else if self.ball_pos.y.floor() + BALL_SIZE.y > bottom {
             sound_controller.play_sfx(SoundEffect::BrickFloor);
             self.lives = self.lives.saturating_sub(1);
             if self.lives == 0 {
@@ -368,21 +417,51 @@ impl BricksState {
             }
             self.launched = false;
             let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
-            self.ball_pos.x = self.paddle_x + paddle_w / 2 - BALL_SIZE.x / 2;
-            self.ball_pos.y = PADDLE_Y - BALL_SIZE.y;
+            self.ball_pos.x = Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
+            self.ball_pos.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
         }
 
         if has_bounced && !hit_brick {
             sound_controller.play_sfx(SoundEffect::BrickBounce);
         }
 
-        if self.bricks.is_empty() {
-            sound_controller.play_sfx(SoundEffect::Win);
-            self.game_result = Some(GameResult::new_win());
+        let current_ball_rect = self.ball_rect();
+        if let Some((rect, ref mut frames)) = self.extra_life {
+            if current_ball_rect.touches(rect) {
+                self.lives = self.lives.saturating_add(1).min(MAX_LIVES);
+                self.extra_life = None;
+                sound_controller.play_sfx(SoundEffect::ExtraLife);
+            } else if *frames == 0 {
+                self.extra_life = None;
+            } else {
+                *frames -= 1;
+            }
+        } else if self.lives > 0 && self.lives < MAX_LIVES && !self.empty_slots.is_empty() {
+            let denom = EXTRA_LIFE_DENOMS[(self.lives - 1) as usize];
+            if next_u16_in(&mut self.rng, 0, denom - 1) == 0 {
+                let slot_idx = next_u16_in(&mut self.rng, 0, (self.empty_slots.len() - 1) as u16) as usize;
+                let pos = self.empty_slots[slot_idx];
+                self.extra_life = Some((Rect::new(pos, EXTRA_LIFE_SIZE), EXTRA_LIFE_FRAMES));
+            }
         }
 
-        if button_controller.is_just_pressed(Button::Start) {
-            println!("{:?}", self.bricks);
+        if self.bricks.is_empty() {
+            if self.level >= 9 {
+                sound_controller.play_sfx(SoundEffect::Win);
+                self.game_result = Some(GameResult::new_win());
+            } else {
+                self.level += 1;
+                self.bricks = make_bricks(self.level);
+                self.launched = false;
+                self.show_level_badge = true;
+                self.extra_life = None;
+                sound_controller.play_sfx(SoundEffect::LevelUp);
+                self.empty_slots.clear();
+                self.ball_vel = vec2(1, -1);
+                let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
+                self.ball_pos.x = Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
+                self.ball_pos.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
+            }
         }
 
         None
@@ -404,6 +483,17 @@ impl BricksState {
                     let pos = SERVE_OFFSET + vec2(16 * i as i32, 0);
                     Object::new(s).set_pos(pos).show(frame);
                 });
+
+            if self.show_level_badge {
+                for i in 0..3 {
+                    Object::new(LEVEL_BADGE.sprite(i as usize))
+                        .set_pos(LVL_BADGE_OFFSET + vec2(32 * i, 0))
+                        .show(frame);
+                }
+                Object::new(LEVEL_NUMS.sprite((self.level - 1) as usize))
+                    .set_pos(LVL_NUM_OFFSET)
+                    .show(frame);
+            }
         }
 
         for brick in &self.bricks {
@@ -415,7 +505,13 @@ impl BricksState {
                 .show(frame);
         }
 
-        self.ball_obj.set_pos(self.ball_pos).show(frame);
+        if let Some((rect, _)) = self.extra_life {
+            self.extra_life_obj.set_pos(rect.position).show(frame);
+        }
+
+        self.ball_obj
+            .set_pos(vec2(self.ball_pos.x.floor(), self.ball_pos.y.floor()))
+            .show(frame);
 
         let mut x = self.paddle_x;
         self.paddle_cap_objs[0]
@@ -431,9 +527,10 @@ impl BricksState {
             .set_pos(vec2(x + TILE_SIZE, PADDLE_Y))
             .show(frame);
 
+        let life_start_x = WIDTH - (LIFE_STRIDE * self.lives as i32);
         for i in 0..self.lives as i32 {
             Object::new(BRICK_BALL.sprite(0))
-                .set_pos(vec2(LIFE_X0 + i * LIFE_STRIDE, LIFE_Y))
+                .set_pos(vec2(life_start_x + i * LIFE_STRIDE, LIFE_Y))
                 .show(frame);
         }
     }

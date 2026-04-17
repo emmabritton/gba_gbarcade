@@ -40,6 +40,8 @@ impl<'gba> SoundController<'gba> {
             SoundEffect::Water => SFX_WATER,
             SoundEffect::Win => SFX_WIN,
             SoundEffect::Lose => SFX_LOSE,
+            SoundEffect::LevelUp => SFX_LEVEL_UP,
+            SoundEffect::ExtraLife => SFX_EXTRA_LIFE,
         };
 
         let mut channel = SoundChannel::new(sound_data);
@@ -74,4 +76,6 @@ pub enum SoundEffect {
     Water,
     Win,
     Lose,
+    LevelUp,
+    ExtraLife,
 }

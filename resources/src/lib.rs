@@ -42,10 +42,13 @@ include_aseprite!(
     "gfx/aster_16.aseprite",
     "gfx/aster_32.aseprite",
     "gfx/aster_64.aseprite",
+    "gfx/bricks_level.aseprite",
+    "gfx/bricks_32x16.aseprite",
 );
 
 include_background_gfx!(
     pub mod bg,
+    "222222",
     sweeper => deduplicate "gfx/minesweeper_tiles.aseprite",
     bg_grid => "gfx/bg_grid_Cell.aseprite",
     bg_invaders => deduplicate "gfx/bg_invaders.aseprite",
@@ -83,6 +86,8 @@ pub static SFX_PLACE: SoundData = include_wav!("sfx/place.wav");
 pub static SFX_WATER: SoundData = include_wav!("sfx/water.wav");
 pub static SFX_WIN: SoundData = include_wav!("sfx/win.wav");
 pub static SFX_LOSE: SoundData = include_wav!("sfx/lost.wav");
+pub static SFX_LEVEL_UP: SoundData = include_wav!("sfx/level_up.wav");
+pub static SFX_EXTRA_LIFE: SoundData = include_wav!("sfx/extra_life.wav");
 
 pub mod prelude {
     pub use crate::bg;
