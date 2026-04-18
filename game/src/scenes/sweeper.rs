@@ -360,9 +360,6 @@ impl SweeperState {
             self.game_result = Some(GameResult::Paused);
             return None;
         }
-        if button_controller.is_just_pressed(Button::Select) {
-            return Some(SceneAction::Menu);
-        }
 
         if self.move_input_timer > 0 {
             self.move_input_timer -= 1;

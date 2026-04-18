@@ -806,9 +806,6 @@ impl PipesState {
             self.paused = true;
             return None;
         }
-        if button_controller.is_just_pressed(Button::Select) {
-            return Some(SceneAction::Menu);
-        }
 
         for slot in &mut self.score_popups {
             if let Some(popup) = slot {
