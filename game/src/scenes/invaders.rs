@@ -384,8 +384,18 @@ impl InvadersState {
             State::Playing => {}
         }
 
+        if matches!(self.game_result, Some(GameResult::Paused)) {
+            if button_controller.is_just_pressed(Button::Start) {
+                self.game_result = None;
+            } else if button_controller.is_just_pressed(Button::Select) {
+                return Some(SceneAction::Menu);
+            }
+            return None;
+        }
+
         if button_controller.is_just_pressed(Button::Start) {
-            return Some(SceneAction::Menu);
+            self.game_result = Some(GameResult::Paused);
+            return None;
         }
 
         if button_controller.is_pressed(Button::Left) {

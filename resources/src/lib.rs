@@ -37,6 +37,7 @@ include_aseprite!(
     "gfx/win.aseprite",
     "gfx/win_highlight.aseprite",
     "gfx/lose.aseprite",
+    "gfx/pause.aseprite",
     "gfx/lose_back.aseprite",
     "gfx/aster_8.aseprite",
     "gfx/aster_16.aseprite",

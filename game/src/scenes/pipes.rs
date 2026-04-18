@@ -361,6 +361,7 @@ pub struct PipesState {
     score_popups: [Option<ScorePopup>; MAX_SCORE_POPUPS],
     move_input_timer: u8,
     place_tile_layer: RegularBackground,
+    paused: bool,
 }
 
 impl PipesState {
@@ -438,6 +439,7 @@ impl PipesState {
             score_popups: [None; MAX_SCORE_POPUPS],
             flow: FlowPhase::WaitingForFirstPipe(countdown),
             move_input_timer: 0,
+            paused: false,
         };
         state.init_tiles();
         state
@@ -789,9 +791,22 @@ impl PipesState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
+        if self.paused {
+            if button_controller.is_just_pressed(Button::Start) {
+                self.paused = false;
+            } else if button_controller.is_just_pressed(Button::Select) {
+                return Some(SceneAction::Menu);
+            }
+            return None;
+        }
+
         if button_controller.is_just_pressed(Button::Start)
-            || button_controller.is_just_pressed(Button::Select)
+            && !matches!(self.flow, FlowPhase::Lose(_) | FlowPhase::Win(_))
         {
+            self.paused = true;
+            return None;
+        }
+        if button_controller.is_just_pressed(Button::Select) {
             return Some(SceneAction::Menu);
         }
 
@@ -888,9 +903,15 @@ impl PipesState {
             }
             FlowPhase::Win(result) => {
                 self.flow = FlowPhase::Win(result.update());
+                if button_controller.is_just_pressed(Button::B) {
+                    return Some(SceneAction::Menu);
+                }
             }
             FlowPhase::Lose(result) => {
                 self.flow = FlowPhase::Lose(result.update());
+                if button_controller.is_just_pressed(Button::B) {
+                    return Some(SceneAction::Menu);
+                }
             }
             FlowPhase::Countdown(frames) => {
                 if *frames == 0 {
@@ -982,7 +1003,7 @@ impl PipesState {
             Object::new(CURSOR).set_pos(vec2(px, py)).show(frame);
         }
 
-        WhiteVariWidthText::new(&format!("Score: {: >5}", self.score), 0).show(vec2(186, 1), frame);
+        WhiteVariWidthText::new(&format!("Score: {: >5}", self.score), 0).show(vec2(180, 1), frame);
 
         if let FlowPhase::Flowing {
             x,
@@ -1006,6 +1027,10 @@ impl PipesState {
             Object::new(popup.sprite)
                 .set_pos(vec2(popup.x as i32, popup.y as i32))
                 .show(frame);
+        }
+
+        if self.paused {
+            GameResult::Paused.show(frame);
         }
     }
 }

@@ -14,6 +14,7 @@ const TAG_OFFSET: Vector2D<i32> = vec2(24, 48);
 
 #[derive(Debug)]
 pub enum GameResult {
+    Running,
     Win {
         input_delay: u8,
         letter_idx: u8,
@@ -24,6 +25,7 @@ pub enum GameResult {
         dark: bool,
         frame_counter: u8,
     },
+    Paused,
 }
 
 impl GameResult {
@@ -45,13 +47,16 @@ impl GameResult {
 
     pub fn input_allowed(&self) -> bool {
         match self {
+            GameResult::Running => false,
             GameResult::Win { input_delay, .. } => *input_delay == 0,
             GameResult::Lose { input_delay, .. } => *input_delay == 0,
+            GameResult::Paused => true,
         }
     }
 
     pub fn update(&self) -> GameResult {
         match self {
+            GameResult::Running => GameResult::Running,
             GameResult::Win {
                 input_delay,
                 letter_idx,
@@ -87,11 +92,13 @@ impl GameResult {
                     frame_counter,
                 }
             }
+            GameResult::Paused => GameResult::Paused,
         }
     }
 
     pub fn show(&self, frame: &mut GraphicsFrame) {
         match self {
+            GameResult::Running => {}
             GameResult::Win { letter_idx, .. } => {
                 let idx = *letter_idx as usize;
                 let idx2 = (idx + 4) % 7;
@@ -120,6 +127,9 @@ impl GameResult {
                     sprite.show(pos, frame);
                 });
                 draw_badge(&sprites::LOSE_BADGE, frame);
+            }
+            GameResult::Paused => {
+                draw_badge(&sprites::PAUSE_BADGE, frame);
             }
         }
     }

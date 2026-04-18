@@ -155,6 +155,15 @@ impl LightsOutState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
+        if matches!(self.game_result, Some(GameResult::Paused)) {
+            if button_controller.is_just_pressed(Button::Start) {
+                self.game_result = None;
+            } else if button_controller.is_just_pressed(Button::Select) {
+                return Some(SceneAction::Menu);
+            }
+            return None;
+        }
+
         if self.game_result.is_some() {
             if let Some(result) = self.game_result.take() {
                 let result = result.update();
@@ -171,9 +180,12 @@ impl LightsOutState {
             return None;
         }
 
-        if button_controller.is_just_pressed(Button::B)
-            || button_controller.is_just_pressed(Button::Start)
-        {
+        if button_controller.is_just_pressed(Button::Start) {
+            self.game_result = Some(GameResult::Paused);
+            return None;
+        }
+
+        if button_controller.is_just_pressed(Button::B) {
             return Some(SceneAction::Menu);
         }
 

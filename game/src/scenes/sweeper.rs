@@ -321,10 +321,13 @@ impl SweeperState {
     ) -> Option<SceneAction> {
         self.frame_counter = self.frame_counter.wrapping_add(1);
 
-        if button_controller.is_just_pressed(Button::Start)
-            || button_controller.is_just_pressed(Button::Select)
-        {
-            return Some(SceneAction::Menu);
+        if matches!(self.game_result, Some(GameResult::Paused)) {
+            if button_controller.is_just_pressed(Button::Start) {
+                self.game_result = None;
+            } else if button_controller.is_just_pressed(Button::Select) {
+                return Some(SceneAction::Menu);
+            }
+            return None;
         }
 
         if matches!(self.state, State::Won | State::Lost) {
@@ -351,6 +354,14 @@ impl SweeperState {
                 }
             }
             return None;
+        }
+
+        if button_controller.is_just_pressed(Button::Start) {
+            self.game_result = Some(GameResult::Paused);
+            return None;
+        }
+        if button_controller.is_just_pressed(Button::Select) {
+            return Some(SceneAction::Menu);
         }
 
         if self.move_input_timer > 0 {
@@ -429,7 +440,7 @@ impl SweeperState {
         self.tile_layer.show(frame);
         self.bg_black.show(frame);
 
-        if !matches!(self.state, State::Won | State::Lost) {
+        if !matches!(self.state, State::Won | State::Lost) && self.game_result.is_none() {
             let (ox, oy) = self.grid_origin();
             let x = (ox + self.cursor_x as i32) * TILE_PX;
             let y = (oy + self.cursor_y as i32) * TILE_PX;

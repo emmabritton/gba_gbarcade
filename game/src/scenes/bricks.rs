@@ -241,6 +241,15 @@ impl BricksState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
+        if matches!(self.game_result, Some(GameResult::Paused)) {
+            if button_controller.is_just_pressed(Button::Start) {
+                self.game_result = None;
+            } else if button_controller.is_just_pressed(Button::Select) {
+                return Some(SceneAction::Menu);
+            }
+            return None;
+        }
+
         if let Some(result) = self.game_result.take() {
             let result = result.update();
             let input = result.input_allowed();
@@ -252,6 +261,11 @@ impl BricksState {
             {
                 return Some(SceneAction::Menu);
             }
+            return None;
+        }
+
+        if button_controller.is_just_pressed(Button::Start) {
+            self.game_result = Some(GameResult::Paused);
             return None;
         }
 
