@@ -144,7 +144,7 @@ impl ConfigState {
         self.grid_bg.show(frame);
 
         let (tag, count) = self.mode.logo();
-        let x = (WIDTH / 2) - (self.mode.logo_width()/2);
+        let x = (WIDTH / 2) - (self.mode.logo_width() / 2);
         let y = 16;
         for i in 0..count {
             let spr_x = x + (i as i32 * 32);
