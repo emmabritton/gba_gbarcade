@@ -1,4 +1,4 @@
-use crate::gfx::{background, ShowSprite};
+use crate::gfx::{ShowSprite, background};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -131,7 +131,7 @@ impl SweeperState {
             TileFormat::FourBpp,
         );
         let bg_black = background(&bg::bg_minesweeper, Priority::P2);
-        Self {
+        let mut state = Self {
             bg_black,
             tile_layer,
             cells: [Cell::empty(); MAX_CELLS],
@@ -147,7 +147,9 @@ impl SweeperState {
             cursor_y: h / 2,
             rng,
             move_input_timer: 0,
-        }
+        };
+        state.update_tiles();
+        state
     }
 
     fn cursor_idx(&self) -> usize {
@@ -372,6 +374,7 @@ impl SweeperState {
                     } else if self.revealed_count >= self.safe_count {
                         self.state = State::CountingDownToWin(WIN_RESULT_DELAY);
                     }
+                    self.update_tiles();
                 }
                 State::Playing => {
                     if self.reveal_from(idx) {
@@ -380,6 +383,7 @@ impl SweeperState {
                     } else if self.revealed_count >= self.safe_count {
                         self.state = State::CountingDownToWin(WIN_RESULT_DELAY);
                     }
+                    self.update_tiles();
                 }
                 State::CountingDownToLose(_) => {}
                 State::CountingDownToWin(_) => {}
@@ -391,6 +395,7 @@ impl SweeperState {
             let cell = &mut self.cells[idx];
             if !cell.is_revealed {
                 cell.is_flagged = !cell.is_flagged;
+                self.update_tiles();
             }
         }
 
@@ -398,7 +403,6 @@ impl SweeperState {
     }
 
     pub fn show(&mut self, frame: &mut GraphicsFrame, is_running: bool) {
-        self.update_tiles();
         self.tile_layer.show(frame);
         self.bg_black.show(frame);
 

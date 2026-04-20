@@ -572,10 +572,12 @@ impl InvadersState {
             }
         }
         for (i, hit) in base_hits.iter().enumerate() {
-            if let Some((b, r, c, h)) = *hit && self.damage_base(b, r, c, h, false) {
-                    sound_controller.play_sfx(SoundEffect::InvaderCrumble);
-                    self.inv_shots[i].active = false;
-                }
+            if let Some((b, r, c, h)) = *hit
+                && self.damage_base(b, r, c, h, false)
+            {
+                sound_controller.play_sfx(SoundEffect::InvaderCrumble);
+                self.inv_shots[i].active = false;
+            }
         }
 
         // invader shot vs player

@@ -352,7 +352,6 @@ pub struct PipesState {
     difficulty: PipeDifficulty,
     rng: RandomNumberGenerator,
     flow: FlowPhase,
-    pending_result: Option<SceneAction>,
     score: i32,
     score_popups: [Option<ScorePopup>; MAX_SCORE_POPUPS],
     move_input_timer: u8,
@@ -433,7 +432,6 @@ impl PipesState {
             score: 0,
             score_popups: [None; MAX_SCORE_POPUPS],
             flow: FlowPhase::WaitingForFirstPipe(countdown),
-            pending_result: None,
             move_input_timer: 0,
         };
         state.init_tiles();
@@ -639,7 +637,7 @@ impl PipesState {
         true
     }
 
-    fn start_flow(&mut self, sound_controller: &mut SoundController) -> Option<SceneAction> {
+    fn start_flow(&mut self) -> Option<SceneAction> {
         let w = self.grid_w as usize;
         let h = self.grid_h as usize;
         for y in 0..h {
@@ -657,10 +655,10 @@ impl PipesState {
                 }
             }
         }
-        self.set_as_loss(sound_controller)
+        self.set_as_loss()
     }
 
-    fn set_as_loss(&mut self, sound_controller: &mut SoundController) -> Option<SceneAction> {
+    fn set_as_loss(&mut self) -> Option<SceneAction> {
         self.clear_pipe_hint();
         Some(SceneAction::Lose)
     }
@@ -672,7 +670,6 @@ impl PipesState {
         enter_from: Direction,
         anim_frame: u8,
         anim_timer: u8,
-        sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
         let new_timer = anim_timer + 1;
         if new_timer < self.difficulty.frames_per_fill_step() {
@@ -719,7 +716,7 @@ impl PipesState {
         let exit_dir = match kind.pipe_exit(enter_from) {
             Some(d) => d,
             None => {
-                return self.set_as_loss(sound_controller);
+                return self.set_as_loss();
             }
         };
 
@@ -732,7 +729,7 @@ impl PipesState {
                 self.clear_pipe_hint();
                 self.flow = FlowPhase::WinCounting { empty_scan_pos: 0 };
             } else {
-                return self.set_as_loss(sound_controller);
+                return self.set_as_loss();
             }
             return None;
         }
@@ -750,7 +747,7 @@ impl PipesState {
         };
 
         if !can_enter || already_filled {
-            return self.set_as_loss(sound_controller);
+            return self.set_as_loss();
         }
 
         self.flow = FlowPhase::Flowing {
@@ -870,14 +867,14 @@ impl PipesState {
                         self.clear_pipe_hint();
                         return Some(SceneAction::Win);
                     } else {
-                        return self.set_as_loss(sound_controller);
+                        return self.set_as_loss();
                     }
                 }
             }
             FlowPhase::Countdown(frames) => {
                 if *frames == 0 {
                     sound_controller.play_sfx(SoundEffect::Water);
-                    if let Some(result) = self.start_flow(sound_controller) {
+                    if let Some(result) = self.start_flow() {
                         return Some(result);
                     }
                 } else {
@@ -891,14 +888,9 @@ impl PipesState {
                 anim_frame,
                 anim_timer,
             } => {
-                if let Some(result) = self.advance_flow(
-                    *x,
-                    *y,
-                    *enter_from,
-                    *anim_frame,
-                    *anim_timer,
-                    sound_controller,
-                ) {
+                if let Some(result) =
+                    self.advance_flow(*x, *y, *enter_from, *anim_frame, *anim_timer)
+                {
                     return Some(result);
                 }
                 if button_controller.is_pressed(Button::R)
@@ -911,14 +903,9 @@ impl PipesState {
                     } = self.flow
                 {
                     for _ in 0..3 {
-                        if let Some(result) = self.advance_flow(
-                            x,
-                            y,
-                            enter_from,
-                            anim_frame,
-                            anim_timer,
-                            sound_controller,
-                        ) {
+                        if let Some(result) =
+                            self.advance_flow(x, y, enter_from, anim_frame, anim_timer)
+                        {
                             return Some(result);
                         }
                     }

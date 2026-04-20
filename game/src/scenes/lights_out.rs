@@ -46,7 +46,6 @@ pub struct LightsOutState {
     grid: [bool; MAX_GRID_W * MAX_GRID_H],
     grid_width: u8,
     grid_height: u8,
-    won: bool,
     bg_black: RegularBackground,
     tile_layer: RegularBackground,
 }
@@ -66,7 +65,6 @@ impl LightsOutState {
             grid: [true; MAX_GRID_W * MAX_GRID_H],
             grid_width: w,
             grid_height: h,
-            won: false,
             bg_black,
             tile_layer,
         }
@@ -161,7 +159,7 @@ impl LightsOutState {
             self.toggle(idx);
             sound_controller.play_sfx(SoundEffect::Place);
             if self.is_solved() {
-                return Some(SceneAction::Win)
+                return Some(SceneAction::Win);
             }
         }
 

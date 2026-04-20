@@ -1,12 +1,12 @@
+use crate::TILE_SIZE;
 use crate::gfx::background_stack;
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
-use crate::TILE_SIZE;
 use agb::display::object::{Object, Sprite, Tag};
 use agb::display::tiled::RegularBackground;
 use agb::display::{GraphicsFrame, WIDTH};
-use agb::fixnum::{vec2, Num, Rect, Vector2D};
+use agb::fixnum::{Num, Rect, Vector2D, vec2};
 use agb::input::{Button, ButtonController};
 use agb::rng::RandomNumberGenerator;
 use alloc::vec;
@@ -45,17 +45,23 @@ const EXTRA_LIFE_FRAMES: u16 = 1800;
 const EXTRA_LIFE_SIZE: Vector2D<i32> = vec2(32, 16);
 const MAX_LIVES: u8 = 16;
 
-// Ball speed per level 
+// Ball speed per level
 const BALL_SPEEDS: [Fp; 9] = [
-    Num::from_raw(256), Num::from_raw(307), Num::from_raw(358),
-    Num::from_raw(409), Num::from_raw(460), Num::from_raw(512),
-    Num::from_raw(563), Num::from_raw(614), Num::from_raw(665),
+    Num::from_raw(256),
+    Num::from_raw(307),
+    Num::from_raw(358),
+    Num::from_raw(409),
+    Num::from_raw(460),
+    Num::from_raw(512),
+    Num::from_raw(563),
+    Num::from_raw(614),
+    Num::from_raw(665),
 ];
 
 // Spawn probabilities for extra life brick
 const EXTRA_LIFE_DENOMS: [u16; 15] = [
-    1000, 2357, 3714, 5071, 6428, 7785, 9142, 10500,
-    11857, 13214, 14571, 15928, 17285, 18642, 20000,
+    1000, 2357, 3714, 5071, 6428, 7785, 9142, 10500, 11857, 13214, 14571, 15928, 17285, 18642,
+    20000,
 ];
 
 const EXTRA_LIFE: &Sprite = sprites::BRICKS_EXTRA_LIFE.sprite(0);
@@ -122,15 +128,69 @@ pub struct BricksState {
 // Level spec is bottom-to-top, so rows[y] = spec[4 - y].
 fn make_bricks(level: u8) -> Vec<Brick> {
     let rows: [BrickKind; 5] = match level {
-        1 => [BrickKind::Blue, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue],
-        2 => [BrickKind::Green, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue],
-        3 => [BrickKind::Yellow, BrickKind::Green, BrickKind::Blue, BrickKind::Blue, BrickKind::Blue],
-        4 => [BrickKind::Orange, BrickKind::Yellow, BrickKind::Green, BrickKind::Blue, BrickKind::Blue],
-        5 => [BrickKind::Red, BrickKind::Orange, BrickKind::Yellow, BrickKind::Green, BrickKind::Blue],
-        6 => [BrickKind::Red, BrickKind::Red, BrickKind::Orange, BrickKind::Yellow, BrickKind::Green],
-        7 => [BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Orange, BrickKind::Yellow],
-        8 => [BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Orange],
-        9 => [BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Red, BrickKind::Red],
+        1 => [
+            BrickKind::Blue,
+            BrickKind::Blue,
+            BrickKind::Blue,
+            BrickKind::Blue,
+            BrickKind::Blue,
+        ],
+        2 => [
+            BrickKind::Green,
+            BrickKind::Blue,
+            BrickKind::Blue,
+            BrickKind::Blue,
+            BrickKind::Blue,
+        ],
+        3 => [
+            BrickKind::Yellow,
+            BrickKind::Green,
+            BrickKind::Blue,
+            BrickKind::Blue,
+            BrickKind::Blue,
+        ],
+        4 => [
+            BrickKind::Orange,
+            BrickKind::Yellow,
+            BrickKind::Green,
+            BrickKind::Blue,
+            BrickKind::Blue,
+        ],
+        5 => [
+            BrickKind::Red,
+            BrickKind::Orange,
+            BrickKind::Yellow,
+            BrickKind::Green,
+            BrickKind::Blue,
+        ],
+        6 => [
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Orange,
+            BrickKind::Yellow,
+            BrickKind::Green,
+        ],
+        7 => [
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Orange,
+            BrickKind::Yellow,
+        ],
+        8 => [
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Orange,
+        ],
+        9 => [
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Red,
+            BrickKind::Red,
+        ],
         _ => unreachable!(),
     };
 
@@ -421,7 +481,8 @@ impl BricksState {
         } else if self.lives > 0 && self.lives < MAX_LIVES && !self.empty_slots.is_empty() {
             let denom = EXTRA_LIFE_DENOMS[(self.lives - 1) as usize];
             if next_u16_in(&mut self.rng, 0, denom - 1) == 0 {
-                let slot_idx = next_u16_in(&mut self.rng, 0, (self.empty_slots.len() - 1) as u16) as usize;
+                let slot_idx =
+                    next_u16_in(&mut self.rng, 0, (self.empty_slots.len() - 1) as u16) as usize;
                 let pos = self.empty_slots[slot_idx];
                 self.extra_life = Some((Rect::new(pos, EXTRA_LIFE_SIZE), EXTRA_LIFE_FRAMES));
             }

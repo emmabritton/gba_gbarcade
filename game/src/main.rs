@@ -14,7 +14,7 @@ mod scenes;
 mod sound_controller;
 
 use crate::scenes::config::ConfigMode;
-use crate::scenes::{SceneHost, SceneAction};
+use crate::scenes::{SceneAction, SceneHost};
 use crate::sound_controller::SoundController;
 use agb::display::tiled::VRAM_MANAGER;
 use agb::display::{Graphics, Rgb15};

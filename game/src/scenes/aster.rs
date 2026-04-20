@@ -387,31 +387,34 @@ impl AsterState {
         self.thrusting = button_controller.is_pressed(Button::Up);
         if self.thrusting {
             let dir = Vector2D::new(-self.player_angle.sin(), -self.player_angle.cos());
-            self.player_vel  += dir * THRUST;
+            self.player_vel += dir * THRUST;
             // Clamp speed
             if self.player_vel.magnitude_squared() > MAX_SPEED_SQ {
                 self.player_vel = self.player_vel.normalise() * num!(3.0);
             }
         }
 
-        self.player_vel  *= FRICTION;
+        self.player_vel *= FRICTION;
 
         self.player_pos = wrap_pos(self.player_pos + self.player_vel);
 
         // Fire
         self.fire_cooldown = self.fire_cooldown.saturating_sub(1);
-        if button_controller.is_just_pressed(Button::A) && self.fire_cooldown == 0 && let Some(slot) = self.bullets.iter().position(|b| !b.active) {
-                let dir = Vector2D::new(-self.player_angle.sin(), -self.player_angle.cos());
-                self.bullets[slot] = Bullet {
-                    pos: self.player_pos,
-                    vel: dir * BULLET_SPEED + self.player_vel,
-                    life: BULLET_LIFE,
-                    active: true,
-                };
-                self.fire_cooldown = FIRE_COOLDOWN;
-                sound_controller.play_sfx(SoundEffect::Place);
-                self.add_popup(self.player_pos, SPRITE_SCORE_BULLET, SCORE_BULLET);
-            }
+        if button_controller.is_just_pressed(Button::A)
+            && self.fire_cooldown == 0
+            && let Some(slot) = self.bullets.iter().position(|b| !b.active)
+        {
+            let dir = Vector2D::new(-self.player_angle.sin(), -self.player_angle.cos());
+            self.bullets[slot] = Bullet {
+                pos: self.player_pos,
+                vel: dir * BULLET_SPEED + self.player_vel,
+                life: BULLET_LIFE,
+                active: true,
+            };
+            self.fire_cooldown = FIRE_COOLDOWN;
+            sound_controller.play_sfx(SoundEffect::Place);
+            self.add_popup(self.player_pos, SPRITE_SCORE_BULLET, SCORE_BULLET);
+        }
 
         for bullet in &mut self.bullets {
             if bullet.active {
@@ -478,7 +481,7 @@ impl AsterState {
         // ufo logic
         if self.ufo_active {
             let move_delta = Vector2D::new(UFO_SPEED * Num::from_raw(self.ufo_dir << 8), num!(0));
-            self.ufo_pos  += move_delta;
+            self.ufo_pos += move_delta;
             let ufo_x = self.ufo_pos.x.floor();
             if !(PLAY_LEFT - UFO_W..=PLAY_RIGHT + UFO_W).contains(&ufo_x) {
                 self.ufo_active = false;

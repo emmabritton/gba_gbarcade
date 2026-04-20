@@ -7,12 +7,11 @@ use agb::input::ButtonController;
 //as otherwise sprite vram sometimes fills
 //up and crashes
 
-pub struct BlankState {
-}
+pub struct BlankState {}
 
 impl BlankState {
     pub fn new() -> Self {
-       Self {}
+        Self {}
     }
 }
 
@@ -25,7 +24,5 @@ impl BlankState {
         None
     }
 
-    pub fn show(&self, _frame: &mut GraphicsFrame) {
-
-    }
+    pub fn show(&self, _frame: &mut GraphicsFrame) {}
 }

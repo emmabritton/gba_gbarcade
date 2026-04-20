@@ -2,6 +2,7 @@ use crate::scenes::aster::AsterState;
 use crate::scenes::blank::BlankState;
 use crate::scenes::bricks::BricksState;
 use crate::scenes::config::{ConfigMode, ConfigState};
+use crate::scenes::game_host_state::GameHostState;
 use crate::scenes::invaders::InvadersState;
 use crate::scenes::lights_out::{LightGridSize, LightsOutState};
 use crate::scenes::menu::MenuState;
@@ -10,18 +11,17 @@ use crate::scenes::sweeper::{SweeperGridSize, SweeperState};
 use crate::sound_controller::SoundController;
 use agb::display::GraphicsFrame;
 use agb::input::{Button, ButtonController};
-use crate::scenes::game_host_state::GameHostState;
 
 pub mod aster;
 pub mod blank;
 pub mod bricks;
 pub mod config;
+mod game_host_state;
 pub mod invaders;
 pub mod lights_out;
 pub mod menu;
 pub mod pipes;
 pub mod sweeper;
-mod game_host_state;
 
 #[allow(clippy::large_enum_variant)]
 enum SceneKind {
@@ -88,18 +88,39 @@ pub struct SceneHost {
 }
 
 impl SceneHost {
-    pub fn menu() -> Self { Self::new(SceneKind::Menu(MenuState::new())) }
-    pub fn blank() -> Self { Self::new(SceneKind::Blank(BlankState::new())) }
-    pub fn pipes(seed: [u32; 4], diff: PipeDifficulty) -> Self { Self::new(SceneKind::Pipes(PipesState::new(seed, diff))) }
-    pub fn bricks(seed: [u32; 4]) -> Self { Self::new(SceneKind::Bricks(BricksState::new(seed))) }
-    pub fn aster(seed: [u32; 4]) -> Self { Self::new(SceneKind::Aster(AsterState::new(seed))) }
-    pub fn sweeper(seed: [u32; 4], size: SweeperGridSize) -> Self { Self::new(SceneKind::Sweeper(SweeperState::new(seed, size))) }
-    pub fn invaders(seed: [u32; 4]) -> Self { Self::new(SceneKind::Invaders(InvadersState::new(seed))) }
-    pub fn lights(size: LightGridSize) -> Self { Self::new(SceneKind::LightsOut(LightsOutState::new(size))) }
-    pub fn config(mode: ConfigMode) -> Self { Self::new(SceneKind::Config(ConfigState::new(mode))) }
+    pub fn menu() -> Self {
+        Self::new(SceneKind::Menu(MenuState::new()))
+    }
+    pub fn blank() -> Self {
+        Self::new(SceneKind::Blank(BlankState::new()))
+    }
+    pub fn pipes(seed: [u32; 4], diff: PipeDifficulty) -> Self {
+        Self::new(SceneKind::Pipes(PipesState::new(seed, diff)))
+    }
+    pub fn bricks(seed: [u32; 4]) -> Self {
+        Self::new(SceneKind::Bricks(BricksState::new(seed)))
+    }
+    pub fn aster(seed: [u32; 4]) -> Self {
+        Self::new(SceneKind::Aster(AsterState::new(seed)))
+    }
+    pub fn sweeper(seed: [u32; 4], size: SweeperGridSize) -> Self {
+        Self::new(SceneKind::Sweeper(SweeperState::new(seed, size)))
+    }
+    pub fn invaders(seed: [u32; 4]) -> Self {
+        Self::new(SceneKind::Invaders(InvadersState::new(seed)))
+    }
+    pub fn lights(size: LightGridSize) -> Self {
+        Self::new(SceneKind::LightsOut(LightsOutState::new(size)))
+    }
+    pub fn config(mode: ConfigMode) -> Self {
+        Self::new(SceneKind::Config(ConfigState::new(mode)))
+    }
 
     fn new(kind: SceneKind) -> Self {
-        Self { kind, game_result: GameHostState::Running }
+        Self {
+            kind,
+            game_result: GameHostState::Running,
+        }
     }
 }
 
@@ -111,7 +132,10 @@ impl SceneHost {
     ) -> Option<SceneAction> {
         self.game_result = self.game_result.update(sound_controller);
 
-        if matches!(self.game_result, GameHostState::Win { .. } | GameHostState::Lose { .. }) {
+        if matches!(
+            self.game_result,
+            GameHostState::Win { .. } | GameHostState::Lose { .. }
+        ) {
             if self.game_result.input_allowed()
                 && (button_controller.is_just_pressed(Button::A)
                     || button_controller.is_just_pressed(Button::B))
@@ -151,7 +175,8 @@ impl SceneHost {
 
     pub fn show(&mut self, frame: &mut GraphicsFrame) {
         self.game_result.show(frame);
-        self.kind.show(frame, self.game_result == GameHostState::Running);
+        self.kind
+            .show(frame, self.game_result == GameHostState::Running);
     }
 }
 
