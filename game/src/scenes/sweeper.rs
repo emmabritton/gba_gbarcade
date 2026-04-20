@@ -103,10 +103,10 @@ const MOVE_TIMER_DURATION: u8 = 10;
 fn neighbors_of_wh(idx: usize, w: usize, h: usize) -> ([usize; 8], usize) {
     let row = idx / w;
     let col = idx % w;
-    let mut buf = [0usize; 8];
-    let mut count = 0usize;
-    for dr in -1i32..=1 {
-        for dc in -1i32..=1 {
+    let mut buf = [0; 8];
+    let mut count = 0;
+    for dr in -1..=1 {
+        for dc in -1..=1 {
             if dr == 0 && dc == 0 {
                 continue;
             }
@@ -131,7 +131,7 @@ fn compute_adjacent(
     for i in 0..total {
         if !mines[i] {
             let (ns, nc) = neighbors_of_wh(i, width, height);
-            let mut count = 0u8;
+            let mut count = 0;
             for j in 0..nc {
                 if mines[ns[j]] {
                     count += 1;
@@ -143,7 +143,6 @@ fn compute_adjacent(
         }
     }
 }
-
 
 pub struct SweeperState {
     cells: [Cell; MAX_CELLS],
@@ -179,7 +178,7 @@ impl SweeperState {
             bg_black,
             tile_layer,
             cells: [Cell::empty(); MAX_CELLS],
-            flood_stack: [0u16; MAX_CELLS],
+            flood_stack: [0; MAX_CELLS],
             width: w,
             height: h,
             mine_count: mines,
@@ -230,38 +229,37 @@ impl SweeperState {
 
         // Build the ring of cells just outside the safe zone
         // These are the first cells that could flood fill, more of them having adj==0 means a bigger opening
-        let mut ring = [0u16; 48];
-        let mut ring_len = 0usize;
+        let mut ring = [0; 48];
+        let mut ring_len = 0;
         for i in 0..total {
             if !safe[i] {
                 continue;
             }
             let (ns, nc) = neighbors_of_wh(i, w, h);
-            for j in 0..nc {
-                let n = ns[j];
-                if safe[n] {
+            for n in ns.iter().take(nc) {
+                if safe[*n] {
                     continue;
                 }
                 let mut already = false;
-                for k in 0..ring_len {
-                    if ring[k] == n as u16 {
+                for ring_element in ring.iter().take(ring_len) {
+                    if *ring_element == *n as u16 {
                         already = true;
                         break;
                     }
                 }
                 if !already && ring_len < ring.len() {
-                    ring[ring_len] = n as u16;
+                    ring[ring_len] = *n as u16;
                     ring_len += 1;
                 }
             }
         }
 
         let mut best_mines = [false; MAX_CELLS];
-        let mut best_score = 0u16;
+        let mut best_score = 0;
 
-        for attempt in 0..5u8 {
+        for attempt in 0..5 {
             let mut mine_map = [false; MAX_CELLS];
-            let mut placed = 0u16;
+            let mut placed = 0;
             while placed < self.mine_count {
                 let idx = next_u16_in(&mut self.rng, 0, (total - 1) as u16) as usize;
                 if !safe[idx] && !mine_map[idx] {
@@ -271,14 +269,14 @@ impl SweeperState {
             }
 
             // Score: count ring cells that would have adj==0, so no mine neighbors
-            let mut score = 0u16;
-            for k in 0..ring_len {
-                let i = ring[k] as usize;
+            let mut score = 0;
+            for ring_element in ring {
+                let i = ring_element as usize;
                 if mine_map[i] {
                     continue;
                 }
                 let (ns, nc) = neighbors_of_wh(i, w, h);
-                let mut mine_count = 0u8;
+                let mut mine_count = 0;
                 for j in 0..nc {
                     if mine_map[ns[j]] {
                         mine_count += 1;
@@ -295,7 +293,7 @@ impl SweeperState {
             }
         }
 
-        let mut adj = [0u8; MAX_CELLS];
+        let mut adj = [0; MAX_CELLS];
         compute_adjacent(&best_mines, &mut adj, total, w, h);
 
         for i in 0..total {

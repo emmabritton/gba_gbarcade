@@ -1,5 +1,5 @@
 use crate::TILE_SIZE;
-use crate::gfx::{background_stack, ShowTag};
+use crate::gfx::{ShowTag, background_stack};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -131,7 +131,7 @@ pub struct BricksState {
     rng: RandomNumberGenerator,
     trap_active: bool,
     //must be 0 before trap can be activated
-    launch_timer: u8
+    launch_timer: u8,
 }
 
 // Row order: index 0 = top row (smallest y on screen), index 4 = bottom row.
@@ -194,7 +194,7 @@ fn make_bricks(level: u8) -> Vec<Brick> {
             BrickKind::Red,
             BrickKind::Orange,
         ],
-        9|10|11|12 => [
+        9..=12 => [
             BrickKind::Red,
             BrickKind::Red,
             BrickKind::Red,
@@ -279,7 +279,7 @@ impl BricksState {
             extra_life: None,
             rng: RandomNumberGenerator::new_with_seed(seed),
             trap_active: false,
-            launch_timer: 0
+            launch_timer: 0,
         }
     }
 }
@@ -348,7 +348,7 @@ impl BricksState {
         let paddle_rect = self.paddle_rect();
         if self.ball_vel.y > 0 && paddle_rect.touches(ball_rect) {
             if self.trap_active {
-                let start_x = self.paddle_x+8;
+                let start_x = self.paddle_x + 8;
                 let end_x = start_x + (self.paddle_len as i32 * 8);
                 if (start_x..end_x).contains(&self.ball_pos.x.round()) {
                     self.launched = false;
@@ -597,7 +597,7 @@ impl BricksState {
             .show(frame);
         for _ in 0..self.paddle_len {
             x += TILE_SIZE;
-            BRICK_PADDLE_M.show(0, vec2(x,PADDLE_Y),frame);
+            BRICK_PADDLE_M.show(0, vec2(x, PADDLE_Y), frame);
         }
         self.paddle_cap_objs[1]
             .set_pos(vec2(x + TILE_SIZE, PADDLE_Y))
@@ -606,7 +606,7 @@ impl BricksState {
         if self.trap_active {
             let y = PADDLE_Y - 8;
             for i in 0..self.paddle_len {
-                sprites::BRICK_TRAP.show(0,vec2(self.paddle_x +8+ (i as i32 * 8),y), frame);
+                sprites::BRICK_TRAP.show(0, vec2(self.paddle_x + 8 + (i as i32 * 8), y), frame);
             }
         }
 
