@@ -100,9 +100,53 @@ impl SweeperGridSize {
 
 const MOVE_TIMER_DURATION: u8 = 10;
 
+fn neighbors_of_wh(idx: usize, w: usize, h: usize) -> ([usize; 8], usize) {
+    let row = idx / w;
+    let col = idx % w;
+    let mut buf = [0usize; 8];
+    let mut count = 0usize;
+    for dr in -1i32..=1 {
+        for dc in -1i32..=1 {
+            if dr == 0 && dc == 0 {
+                continue;
+            }
+            let nr = row as i32 + dr;
+            let nc = col as i32 + dc;
+            if nr >= 0 && nc >= 0 && (nr as usize) < h && (nc as usize) < w {
+                buf[count] = nr as usize * w + nc as usize;
+                count += 1;
+            }
+        }
+    }
+    (buf, count)
+}
+
+fn compute_adjacent(
+    mines: &[bool; MAX_CELLS],
+    adj_out: &mut [u8; MAX_CELLS],
+    total: usize,
+    width: usize,
+    height: usize,
+) {
+    for i in 0..total {
+        if !mines[i] {
+            let (ns, nc) = neighbors_of_wh(i, width, height);
+            let mut count = 0u8;
+            for j in 0..nc {
+                if mines[ns[j]] {
+                    count += 1;
+                }
+            }
+            adj_out[i] = count;
+        } else {
+            adj_out[i] = 0;
+        }
+    }
+}
+
+
 pub struct SweeperState {
     cells: [Cell; MAX_CELLS],
-    // Reusable scratch buffer for flood-fill; kept in struct to avoid large stack allocs.
     flood_stack: [u16; MAX_CELLS],
     width: u8,
     height: u8,
@@ -156,7 +200,6 @@ impl SweeperState {
         self.cursor_y as usize * self.width as usize + self.cursor_x as usize
     }
 
-    //returns tile coords
     fn grid_origin(&self) -> (i32, i32) {
         let w = self.width as i32 * TILE_PX;
         let h = self.height as i32 * TILE_PX;
@@ -165,64 +208,105 @@ impl SweeperState {
     }
 
     fn neighbors_of(&self, idx: usize) -> ([usize; 8], usize) {
-        let w = self.width as usize;
-        let h = self.height as usize;
-        let row = idx / w;
-        let col = idx % w;
-        let mut buf = [0; 8];
-        let mut count = 0;
-        for dr in -1i32..=1 {
-            for dc in -1i32..=1 {
-                if dr == 0 && dc == 0 {
-                    continue;
-                }
-                let nr = row as i32 + dr;
-                let nc = col as i32 + dc;
-                if nr >= 0 && nc >= 0 && (nr as usize) < h && (nc as usize) < w {
-                    buf[count] = nr as usize * w + nc as usize;
-                    count += 1;
-                }
-            }
-        }
-        (buf, count)
+        neighbors_of_wh(idx, self.width as usize, self.height as usize)
     }
 
-    // Place mines randomly after the first reveal, guaranteeing the clicked cell
-    // and all its neighbors are mine-free.
+    // Place mines after the first reveal, guaranteeing the clicked cell and all its neighbors are mine free
+    // Then generates 5 candidates and picks the one where the
+    // most cells just outside the safe zone have adj==0 (flood fill eligible), which
+    // tends to produce larger openings and reduce forced guessing
+    // can take a moment on the largest grid
     fn place_mines(&mut self, safe_idx: usize) {
         let total = self.width as usize * self.height as usize;
+        let w = self.width as usize;
+        let h = self.height as usize;
+
         let mut safe = [false; MAX_CELLS];
         safe[safe_idx] = true;
-        let (ns, nc) = self.neighbors_of(safe_idx);
-        for i in 0..nc {
-            safe[ns[i]] = true;
+        let (ns0, nc0) = neighbors_of_wh(safe_idx, w, h);
+        for i in 0..nc0 {
+            safe[ns0[i]] = true;
         }
 
-        let mut placed = 0;
-        while placed < self.mine_count {
-            let idx = next_u16_in(&mut self.rng, 0, (total - 1) as u16) as usize;
-            if !safe[idx] && !self.cells[idx].is_mine {
-                self.cells[idx].is_mine = true;
-                placed += 1;
-            }
-        }
-
+        // Build the ring of cells just outside the safe zone
+        // These are the first cells that could flood fill, more of them having adj==0 means a bigger opening
+        let mut ring = [0u16; 48];
+        let mut ring_len = 0usize;
         for i in 0..total {
-            if !self.cells[i].is_mine {
-                let (ns2, nc2) = self.neighbors_of(i);
-                let mut adj = 0;
-                for i in ns2.iter().take(nc2) {
-                    if self.cells[*i].is_mine {
-                        adj += 1;
+            if !safe[i] {
+                continue;
+            }
+            let (ns, nc) = neighbors_of_wh(i, w, h);
+            for j in 0..nc {
+                let n = ns[j];
+                if safe[n] {
+                    continue;
+                }
+                let mut already = false;
+                for k in 0..ring_len {
+                    if ring[k] == n as u16 {
+                        already = true;
+                        break;
                     }
                 }
-                self.cells[i].adjacent = adj;
+                if !already && ring_len < ring.len() {
+                    ring[ring_len] = n as u16;
+                    ring_len += 1;
+                }
             }
+        }
+
+        let mut best_mines = [false; MAX_CELLS];
+        let mut best_score = 0u16;
+
+        for attempt in 0..5u8 {
+            let mut mine_map = [false; MAX_CELLS];
+            let mut placed = 0u16;
+            while placed < self.mine_count {
+                let idx = next_u16_in(&mut self.rng, 0, (total - 1) as u16) as usize;
+                if !safe[idx] && !mine_map[idx] {
+                    mine_map[idx] = true;
+                    placed += 1;
+                }
+            }
+
+            // Score: count ring cells that would have adj==0, so no mine neighbors
+            let mut score = 0u16;
+            for k in 0..ring_len {
+                let i = ring[k] as usize;
+                if mine_map[i] {
+                    continue;
+                }
+                let (ns, nc) = neighbors_of_wh(i, w, h);
+                let mut mine_count = 0u8;
+                for j in 0..nc {
+                    if mine_map[ns[j]] {
+                        mine_count += 1;
+                    }
+                }
+                if mine_count == 0 {
+                    score += 1;
+                }
+            }
+
+            if attempt == 0 || score > best_score {
+                best_score = score;
+                best_mines = mine_map;
+            }
+        }
+
+        let mut adj = [0u8; MAX_CELLS];
+        compute_adjacent(&best_mines, &mut adj, total, w, h);
+
+        for i in 0..total {
+            self.cells[i].is_mine = best_mines[i];
+            self.cells[i].adjacent = adj[i];
         }
     }
 
-    // Reveal starting at start_idx. Flood-fills through zero-adjacent cells.
-    // Returns true if a mine was hit.
+    // Reveal starting at start_idx
+    // Flood fills through zero-adjacent cells
+    // Return true if a mine was hit
     fn reveal_from(&mut self, start_idx: usize) -> bool {
         let cell = self.cells[start_idx];
         if cell.is_flagged || cell.is_revealed {
