@@ -1,4 +1,3 @@
-use crate::game_result::GameResult;
 use crate::gfx::{background, ShowSprite};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
@@ -50,8 +49,8 @@ impl Cell {
 enum State {
     FirstMove,
     Playing,
-    Won,
-    Lost,
+    CountingDownToWin(u8),
+    CountingDownToLose(u8),
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -115,12 +114,9 @@ pub struct SweeperState {
     cursor_x: u8,
     cursor_y: u8,
     rng: RandomNumberGenerator,
-    frame_counter: u16,
     tile_layer: RegularBackground,
     bg_black: RegularBackground,
     move_input_timer: u8,
-    game_result: Option<GameResult>,
-    result_show_delay: u8,
 }
 
 impl SweeperState {
@@ -150,10 +146,7 @@ impl SweeperState {
             cursor_x: w / 2,
             cursor_y: h / 2,
             rng,
-            frame_counter: 0,
             move_input_timer: 0,
-            game_result: None,
-            result_show_delay: 0,
         }
     }
 
@@ -272,9 +265,9 @@ impl SweeperState {
         let (tile_ox, tile_oy) = self.grid_origin();
         let w = self.width as usize;
         let h = self.height as usize;
-        let game_over = matches!(self.state, State::Won | State::Lost);
-        let lost = self.state == State::Lost;
-        let won = self.state == State::Won;
+        let won = matches!(self.state, State::CountingDownToWin(_));
+        let lost = matches!(self.state, State::CountingDownToLose(_));
+        let game_over = won || lost;
 
         for row in 0..h {
             for col in 0..w {
@@ -319,46 +312,23 @@ impl SweeperState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
-        self.frame_counter = self.frame_counter.wrapping_add(1);
-
-        if matches!(self.game_result, Some(GameResult::Paused)) {
-            if button_controller.is_just_pressed(Button::Start) {
-                self.game_result = None;
-            } else if button_controller.is_just_pressed(Button::Select) {
-                return Some(SceneAction::Menu);
-            }
-            return None;
-        }
-
-        if matches!(self.state, State::Won | State::Lost) {
-            if self.result_show_delay > 0 {
-                if self.result_show_delay == 1 {
-                    if self.state == State::Won {
-                        sound_controller.play_sfx(SoundEffect::Win);
-                    } else if self.state == State::Lost {
-                        sound_controller.play_sfx(SoundEffect::Lose);
-                    }
-                }
-                self.result_show_delay -= 1;
-                return None;
-            }
-            if let Some(result) = self.game_result.take() {
-                let result = result.update();
-                let input = result.input_allowed();
-                self.game_result = Some(result);
-                if input
-                    && (button_controller.is_just_pressed(Button::A)
-                        || button_controller.is_just_pressed(Button::B))
-                {
-                    return Some(SceneAction::Menu);
+        match self.state {
+            State::FirstMove => {}
+            State::Playing => {}
+            State::CountingDownToWin(frames_remaining) => {
+                if frames_remaining > 0 {
+                    self.state = State::CountingDownToWin(frames_remaining - 1);
+                } else {
+                    return Some(SceneAction::Win);
                 }
             }
-            return None;
-        }
-
-        if button_controller.is_just_pressed(Button::Start) {
-            self.game_result = Some(GameResult::Paused);
-            return None;
+            State::CountingDownToLose(frames_remaining) => {
+                if frames_remaining > 0 {
+                    self.state = State::CountingDownToLose(frames_remaining - 1);
+                } else {
+                    return Some(SceneAction::Lose);
+                }
+            }
         }
 
         if self.move_input_timer > 0 {
@@ -400,24 +370,19 @@ impl SweeperState {
                     if self.reveal_from(idx) {
                         panic!("First click contained mine");
                     } else if self.revealed_count >= self.safe_count {
-                        self.state = State::Won;
-                        self.game_result = Some(GameResult::new_win());
-                        self.result_show_delay = WIN_RESULT_DELAY;
+                        self.state = State::CountingDownToWin(WIN_RESULT_DELAY);
                     }
                 }
                 State::Playing => {
                     if self.reveal_from(idx) {
                         sound_controller.play_sfx(SoundEffect::Explosion);
-                        self.state = State::Lost;
-                        self.game_result = Some(GameResult::new_lose());
-                        self.result_show_delay = LOSE_RESULT_DELAY;
+                        self.state = State::CountingDownToLose(LOSE_RESULT_DELAY);
                     } else if self.revealed_count >= self.safe_count {
-                        self.state = State::Won;
-                        self.game_result = Some(GameResult::new_win());
-                        self.result_show_delay = WIN_RESULT_DELAY;
+                        self.state = State::CountingDownToWin(WIN_RESULT_DELAY);
                     }
                 }
-                _ => {}
+                State::CountingDownToLose(_) => {}
+                State::CountingDownToWin(_) => {}
             }
         }
 
@@ -432,24 +397,18 @@ impl SweeperState {
         None
     }
 
-    pub fn show(&mut self, frame: &mut GraphicsFrame) {
+    pub fn show(&mut self, frame: &mut GraphicsFrame, is_running: bool) {
         self.update_tiles();
         self.tile_layer.show(frame);
         self.bg_black.show(frame);
 
-        if !matches!(self.state, State::Won | State::Lost) && self.game_result.is_none() {
+        if is_running {
             let (ox, oy) = self.grid_origin();
             let x = (ox + self.cursor_x as i32) * TILE_PX;
             let y = (oy + self.cursor_y as i32) * TILE_PX;
             sprites::MINESWEEPER_SELECT
                 .sprite(0)
                 .show(vec2(x, y), frame);
-        }
-
-        if self.result_show_delay == 0
-            && let Some(result) = &self.game_result
-        {
-            result.show(frame);
         }
     }
 }

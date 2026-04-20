@@ -1,4 +1,3 @@
-use crate::game_result::GameResult;
 use crate::gfx::background_stack;
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
@@ -117,7 +116,6 @@ pub struct BricksState {
     show_level_badge: bool,
     extra_life: Option<(Rect<i32>, u16)>,
     rng: RandomNumberGenerator,
-    game_result: Option<GameResult>,
 }
 
 // Row order: index 0 = top row (smallest y on screen), index 4 = bottom row.
@@ -137,7 +135,7 @@ fn make_bricks(level: u8) -> Vec<Brick> {
     };
 
     let mut bricks = vec![];
-    for y in 0..5 {
+    for (y, row) in rows.iter().enumerate() {
         for x in 0..6 {
             let rect = Rect::new(
                 vec2(
@@ -146,7 +144,7 @@ fn make_bricks(level: u8) -> Vec<Brick> {
                 ),
                 vec2(32, 10),
             );
-            bricks.push(Brick { kind: rows[y], rect });
+            bricks.push(Brick { kind: *row, rect });
         }
     }
     bricks
@@ -210,7 +208,6 @@ impl BricksState {
             show_level_badge: true,
             extra_life: None,
             rng: RandomNumberGenerator::new_with_seed(seed),
-            game_result: None,
         }
     }
 }
@@ -241,34 +238,6 @@ impl BricksState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
-        if matches!(self.game_result, Some(GameResult::Paused)) {
-            if button_controller.is_just_pressed(Button::Start) {
-                self.game_result = None;
-            } else if button_controller.is_just_pressed(Button::Select) {
-                return Some(SceneAction::Menu);
-            }
-            return None;
-        }
-
-        if let Some(result) = self.game_result.take() {
-            let result = result.update();
-            let input = result.input_allowed();
-            self.game_result = Some(result);
-            if input
-                && (button_controller.is_just_pressed(Button::A)
-                    || button_controller.is_just_pressed(Button::B)
-                    || button_controller.is_just_pressed(Button::Start))
-            {
-                return Some(SceneAction::Menu);
-            }
-            return None;
-        }
-
-        if button_controller.is_just_pressed(Button::Start) {
-            self.game_result = Some(GameResult::Paused);
-            return None;
-        }
-
         let max_x = BOUNDS.bottom_right().x - ((self.paddle_len as i32 + 2) * TILE_SIZE);
         if button_controller.is_pressed(Button::Left) {
             self.paddle_x = self.paddle_x.saturating_sub(PADDLE_SPEED);
@@ -426,8 +395,7 @@ impl BricksState {
             sound_controller.play_sfx(SoundEffect::BrickFloor);
             self.lives = self.lives.saturating_sub(1);
             if self.lives == 0 {
-                sound_controller.play_sfx(SoundEffect::Lose);
-                self.game_result = Some(GameResult::new_lose());
+                return Some(SceneAction::Lose);
             }
             self.launched = false;
             let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
@@ -461,8 +429,7 @@ impl BricksState {
 
         if self.bricks.is_empty() {
             if self.level >= 9 {
-                sound_controller.play_sfx(SoundEffect::Win);
-                self.game_result = Some(GameResult::new_win());
+                return Some(SceneAction::Win);
             } else {
                 self.level += 1;
                 self.bricks = make_bricks(self.level);
@@ -483,10 +450,6 @@ impl BricksState {
 
     pub fn show(&mut self, frame: &mut GraphicsFrame) {
         self.backgrounds[0].show(frame);
-
-        if let Some(result) = &self.game_result {
-            result.show(frame);
-        }
 
         if !self.launched {
             sprites::SERVE_LABEL

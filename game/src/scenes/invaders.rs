@@ -1,4 +1,3 @@
-use crate::game_result::GameResult;
 use crate::gfx::background;
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
@@ -40,7 +39,7 @@ const SHOT_H: i32 = 8;
 const GRID_INIT_X: i32 = 22;
 const GRID_INIT_Y: i32 = 20;
 
-const LEFT_WALL: i32 = 4;
+const LEFT_WALL: i32 = 2;
 const RIGHT_WALL: i32 = WIDTH - LEFT_WALL;
 
 const ADVANCE_STEP: i32 = 2;
@@ -206,8 +205,6 @@ impl Shot {
 enum State {
     Playing,
     PlayerDead,
-    GameOver,
-    Victory,
 }
 
 pub struct InvadersState {
@@ -261,7 +258,6 @@ pub struct InvadersState {
     // true = tile was last damaged from below (player shot) -> render with vflip.
     base_flip: [[[bool; BASE_COLS]; BASE_ROWS]; NUM_BASES],
     move_sound: bool,
-    game_result: Option<GameResult>,
 }
 
 impl InvadersState {
@@ -315,7 +311,6 @@ impl InvadersState {
             state_timer: 0,
             base_flip,
             move_sound: false,
-            game_result: None,
         };
         state.paint_all_base_tiles();
         state
@@ -351,50 +346,16 @@ impl InvadersState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
-        match self.state {
-            State::GameOver | State::Victory => {
-                if let Some(result) = self.game_result.take() {
-                    let result = result.update();
-                    let input = result.input_allowed();
-                    self.game_result = Some(result);
-                    if input
-                        && (button_controller.is_just_pressed(Button::A)
-                            || button_controller.is_just_pressed(Button::Start))
-                    {
-                        return Some(SceneAction::Menu);
-                    }
-                }
-                return None;
+        if self.state == State::PlayerDead {
+            if self.state_timer > 0 {
+                self.state_timer -= 1;
+            } else if self.lives == 0 {
+                return Some(SceneAction::Lose);
+            } else {
+                self.lives -= 1;
+                self.reset_player();
+                self.state = State::Playing;
             }
-            State::PlayerDead => {
-                if self.state_timer > 0 {
-                    self.state_timer -= 1;
-                } else if self.lives == 0 {
-                    self.state = State::GameOver;
-                    self.state_timer = 0;
-                    sound_controller.play_sfx(SoundEffect::Lose);
-                    self.game_result = Some(GameResult::new_lose());
-                } else {
-                    self.lives -= 1;
-                    self.reset_player();
-                    self.state = State::Playing;
-                }
-                return None;
-            }
-            State::Playing => {}
-        }
-
-        if matches!(self.game_result, Some(GameResult::Paused)) {
-            if button_controller.is_just_pressed(Button::Start) {
-                self.game_result = None;
-            } else if button_controller.is_just_pressed(Button::Select) {
-                return Some(SceneAction::Menu);
-            }
-            return None;
-        }
-
-        if button_controller.is_just_pressed(Button::Start) {
-            self.game_result = Some(GameResult::Paused);
             return None;
         }
 
@@ -582,11 +543,7 @@ impl InvadersState {
                             self.advance_timer = new_period;
                         }
                         if self.alive_count == 0 {
-                            self.state = State::Victory;
-                            self.state_timer = 0;
-                            sound_controller.play_sfx(SoundEffect::Win);
-                            self.game_result = Some(GameResult::new_win());
-                            return None;
+                            return Some(SceneAction::Win);
                         }
                     }
                 }
@@ -649,11 +606,7 @@ impl InvadersState {
                 if self.is_alive(row * COLS + col) {
                     let iy = self.grid_y + row as i32 * ROW_STRIDE;
                     if iy + INV_H >= DANGER_Y {
-                        self.state = State::GameOver;
-                        self.state_timer = 0;
-                        sound_controller.play_sfx(SoundEffect::Lose);
-                        self.game_result = Some(GameResult::new_lose());
-                        return None;
+                        return Some(SceneAction::Lose);
                     }
                     break 'danger;
                 }
@@ -666,10 +619,6 @@ impl InvadersState {
     pub fn show(&mut self, frame: &mut GraphicsFrame) {
         self.background.show(frame);
         self.brick_background.show(frame);
-
-        if let Some(result) = &self.game_result {
-            result.show(frame);
-        }
 
         for row in 0..ROWS {
             for col in 0..COLS {

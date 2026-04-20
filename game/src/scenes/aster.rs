@@ -1,4 +1,3 @@
-use crate::game_result::GameResult;
 use crate::gfx::background;
 use crate::printer::WhiteVariWidthText;
 use crate::rng::{next_i32, next_u16_in};
@@ -200,8 +199,6 @@ impl ScorePopup {
 enum GameState {
     Playing,
     PlayerDead,
-    GameOver,
-    Victory,
 }
 
 pub struct AsterState {
@@ -235,7 +232,6 @@ pub struct AsterState {
     state_timer: u16,
     death_pos: Vector2D<i32>,
     score: i32,
-    game_result: Option<GameResult>,
 }
 
 impl AsterState {
@@ -269,7 +265,6 @@ impl AsterState {
             state: GameState::Playing,
             state_timer: 0,
             death_pos: vec2(CENTER_X, CENTER_Y),
-            game_result: None,
             score: 0,
         };
 
@@ -369,49 +364,16 @@ impl AsterState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
-        match self.state {
-            GameState::GameOver | GameState::Victory => {
-                if let Some(result) = self.game_result.take() {
-                    let result = result.update();
-                    let input_ok = result.input_allowed();
-                    self.game_result = Some(result);
-                    if input_ok
-                        && (button_controller.is_just_pressed(Button::A)
-                            || button_controller.is_just_pressed(Button::Start))
-                    {
-                        return Some(SceneAction::Menu);
-                    }
-                }
-                return None;
+        if self.state == GameState::PlayerDead {
+            if self.state_timer > 0 {
+                self.state_timer -= 1;
+            } else if self.lives == 0 {
+                return Some(SceneAction::Lose);
+            } else {
+                self.lives -= 1;
+                self.respawn_player();
+                self.state = GameState::Playing;
             }
-            GameState::PlayerDead => {
-                if self.state_timer > 0 {
-                    self.state_timer -= 1;
-                } else if self.lives == 0 {
-                    self.state = GameState::GameOver;
-                    sound_controller.play_sfx(SoundEffect::Lose);
-                    self.game_result = Some(GameResult::new_lose());
-                } else {
-                    self.lives -= 1;
-                    self.respawn_player();
-                    self.state = GameState::Playing;
-                }
-                return None;
-            }
-            GameState::Playing => {}
-        }
-
-        if matches!(self.game_result, Some(GameResult::Paused)) {
-            if button_controller.is_just_pressed(Button::Start) {
-                self.game_result = None;
-            } else if button_controller.is_just_pressed(Button::Select) {
-                return Some(SceneAction::Menu);
-            }
-            return None;
-        }
-
-        if button_controller.is_just_pressed(Button::Start) {
-            self.game_result = Some(GameResult::Paused);
             return None;
         }
 
@@ -626,21 +588,15 @@ impl AsterState {
         }
 
         if self.asteroids.iter().all(|a| !a.active) {
-            self.state = GameState::Victory;
-            sound_controller.play_sfx(SoundEffect::Win);
-            self.game_result = Some(GameResult::new_win());
+            return Some(SceneAction::Win);
         }
 
         None
     }
 
-    pub fn show(&mut self, frame: &mut GraphicsFrame) {
+    pub fn show(&mut self, frame: &mut GraphicsFrame, is_running: bool) {
         self.bg_back.show(frame);
         self.bg_fore.show(frame);
-
-        if let Some(result) = &self.game_result {
-            result.show(frame);
-        }
 
         WhiteVariWidthText::new(&format!("Score: {: >5}", self.score), 0).show(vec2(180, 1), frame);
 
@@ -668,6 +624,7 @@ impl AsterState {
             let uy = self.ufo_pos.y.floor();
             Object::new(SPRITE_UFO)
                 .set_pos(vec2(ux - UFO_W / 2, uy - UFO_H / 2))
+                .set_priority(Priority::P2)
                 .show(frame);
         }
 
@@ -675,13 +632,14 @@ impl AsterState {
             if bullet.active {
                 Object::new(SPRITE_BULLET)
                     .set_pos(vec2(bullet.pos.x.floor(), bullet.pos.y.floor()))
+                    .set_priority(Priority::P2)
                     .show(frame);
             }
         }
 
         // draw player
         match self.state {
-            GameState::Playing | GameState::GameOver | GameState::Victory => {
+            GameState::Playing => {
                 let visible = self.invincible == 0 || (self.invincible / 4).is_multiple_of(2);
                 if visible {
                     let engine_power = if self.thrusting {
@@ -700,18 +658,21 @@ impl AsterState {
                     let anim_frame = (elapsed / 4) as usize % 5;
                     Object::new(TAG_DEATH.sprite(anim_frame))
                         .set_pos(self.death_pos - vec2(16, 16))
+                        .set_priority(Priority::P2)
                         .show(frame);
                 }
             }
         }
 
-        for popup in &self.popups {
-            if popup.active {
-                let px = popup.pos.x.floor();
-                let py = popup.pos.y.floor() - 12;
-                Object::new(popup.sprite)
-                    .set_pos(vec2(px - 4, py))
-                    .show(frame);
+        if is_running {
+            for popup in &self.popups {
+                if popup.active {
+                    let px = popup.pos.x.floor();
+                    let py = popup.pos.y.floor() - 12;
+                    Object::new(popup.sprite)
+                        .set_pos(vec2(px - 4, py))
+                        .show(frame);
+                }
             }
         }
     }
@@ -727,6 +688,7 @@ fn draw_player(pos: Vector2D<i32>, angle: Angle, engine_power: usize, frame: &mu
         AffineMode::Affine,
     )
     .set_pos(pos - vec2(32, 32))
+    .set_priority(Priority::P2)
     .show(frame)
 }
 

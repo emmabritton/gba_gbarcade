@@ -5,7 +5,6 @@
 #![cfg_attr(test, test_runner(agb::test_runner::test_runner))]
 
 mod direction;
-mod game_result;
 mod gfx;
 pub mod grid_background;
 mod menu_cursor;
@@ -14,16 +13,8 @@ mod rng;
 mod scenes;
 mod sound_controller;
 
-use crate::scenes::aster::AsterState;
-use crate::scenes::blank::BlankState;
-use crate::scenes::bricks::BricksState;
-use crate::scenes::config::{ConfigMode, ConfigState};
-use crate::scenes::invaders::InvadersState;
-use crate::scenes::lights_out::LightsOutState;
-use crate::scenes::menu::MenuState;
-use crate::scenes::pipes::PipesState;
-use crate::scenes::sweeper::SweeperState;
-use crate::scenes::{Scene, SceneAction};
+use crate::scenes::config::ConfigMode;
+use crate::scenes::{SceneHost, SceneAction};
 use crate::sound_controller::SoundController;
 use agb::display::tiled::VRAM_MANAGER;
 use agb::display::{Graphics, Rgb15};
@@ -51,7 +42,7 @@ fn run(mixer: Mixer, mut gfx: Graphics, mut button_controller: ButtonController)
 
     let mut rng_seed: [u32; 4] = [1; 4];
     let mut sound_controller = SoundController::new(mixer);
-    let mut scene = Scene::Menu(MenuState::new());
+    let mut scene = SceneHost::menu();
     let mut pending_action: Option<SceneAction> = None;
 
     loop {
@@ -69,27 +60,24 @@ fn run(mixer: Mixer, mut gfx: Graphics, mut button_controller: ButtonController)
 
         if let Some(action) = pending_action.take() {
             scene = match action {
-                SceneAction::Menu => Scene::Menu(MenuState::new()),
-                SceneAction::Pipes(diff) => Scene::Pipes(PipesState::new(rng_seed, diff)),
-                SceneAction::Bricks => Scene::Bricks(BricksState::new(rng_seed)),
-                SceneAction::Aster => Scene::Aster(AsterState::new(rng_seed)),
-                SceneAction::Sweeper(diff) => Scene::Sweeper(SweeperState::new(rng_seed, diff)),
-                SceneAction::Invaders => Scene::Invaders(InvadersState::new(rng_seed)),
-                SceneAction::Lights(diff) => Scene::LightsOut(LightsOutState::new(diff)),
-                SceneAction::SweeperConfig => {
-                    Scene::Config(ConfigState::new(ConfigMode::Sweeper))
-                }
-                SceneAction::PipesConfig => Scene::Config(ConfigState::new(ConfigMode::Pipes)),
-                SceneAction::LightsConfig => {
-                    Scene::Config(ConfigState::new(ConfigMode::LightsOut))
-                }
+                SceneAction::Menu => SceneHost::menu(),
+                SceneAction::Pipes(diff) => SceneHost::pipes(rng_seed, diff),
+                SceneAction::Bricks => SceneHost::bricks(rng_seed),
+                SceneAction::Aster => SceneHost::aster(rng_seed),
+                SceneAction::Sweeper(size) => SceneHost::sweeper(rng_seed, size),
+                SceneAction::Invaders => SceneHost::invaders(rng_seed),
+                SceneAction::Lights(size) => SceneHost::lights(size),
+                SceneAction::SweeperConfig => SceneHost::config(ConfigMode::Sweeper),
+                SceneAction::PipesConfig => SceneHost::config(ConfigMode::Pipes),
+                SceneAction::LightsConfig => SceneHost::config(ConfigMode::LightsOut),
+                SceneAction::Win | SceneAction::Lose => unreachable!(),
             };
         } else {
             pending_action = scene.update(&mut button_controller, &mut sound_controller);
             if pending_action.is_some() {
                 //unload current scene so memory can be reclaimed before
                 //creating new scene on next frame
-                scene = Scene::Blank(BlankState::new());
+                scene = SceneHost::blank();
             }
         }
 

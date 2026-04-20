@@ -1,4 +1,3 @@
-use crate::game_result::GameResult;
 use crate::gfx::{ShowSprite, background};
 use crate::menu_cursor::MenuCursor;
 use crate::scenes::SceneAction;
@@ -47,7 +46,7 @@ pub struct LightsOutState {
     grid: [bool; MAX_GRID_W * MAX_GRID_H],
     grid_width: u8,
     grid_height: u8,
-    game_result: Option<GameResult>,
+    won: bool,
     bg_black: RegularBackground,
     tile_layer: RegularBackground,
 }
@@ -67,7 +66,7 @@ impl LightsOutState {
             grid: [true; MAX_GRID_W * MAX_GRID_H],
             grid_width: w,
             grid_height: h,
-            game_result: None,
+            won: false,
             bg_black,
             tile_layer,
         }
@@ -155,40 +154,6 @@ impl LightsOutState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
-        if matches!(self.game_result, Some(GameResult::Paused)) {
-            if button_controller.is_just_pressed(Button::Start) {
-                self.game_result = None;
-            } else if button_controller.is_just_pressed(Button::Select) {
-                return Some(SceneAction::Menu);
-            }
-            return None;
-        }
-
-        if self.game_result.is_some() {
-            if let Some(result) = self.game_result.take() {
-                let result = result.update();
-                let input = result.input_allowed();
-                self.game_result = Some(result);
-                if input
-                    && (button_controller.is_just_pressed(Button::A)
-                        || button_controller.is_just_pressed(Button::B)
-                        || button_controller.is_just_pressed(Button::Start))
-                {
-                    return Some(SceneAction::Menu);
-                }
-            }
-            return None;
-        }
-
-        if button_controller.is_just_pressed(Button::Start) {
-            self.game_result = Some(GameResult::Paused);
-            return None;
-        }
-
-        if button_controller.is_just_pressed(Button::B) {
-            return Some(SceneAction::Menu);
-        }
-
         self.cursor.update(button_controller, sound_controller);
 
         if button_controller.is_just_pressed(Button::A) {
@@ -196,23 +161,19 @@ impl LightsOutState {
             self.toggle(idx);
             sound_controller.play_sfx(SoundEffect::Place);
             if self.is_solved() {
-                self.game_result = Some(GameResult::new_win());
+                return Some(SceneAction::Win)
             }
         }
 
         None
     }
 
-    pub fn show(&mut self, frame: &mut GraphicsFrame) {
-        if let Some(result) = &self.game_result {
-            result.show(frame);
-        }
-
+    pub fn show(&mut self, frame: &mut GraphicsFrame, is_running: bool) {
         self.update_tiles();
         self.tile_layer.show(frame);
         self.bg_black.show(frame);
 
-        if self.game_result.is_none() {
+        if is_running {
             let (ox, oy) = self.grid_origin();
             let (col, row) = self.cursor.pos_usize();
             let x = ox + col as i32 * LIGHT_SIZE;

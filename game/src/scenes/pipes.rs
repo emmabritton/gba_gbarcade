@@ -1,5 +1,4 @@
 use crate::direction::Direction;
-use crate::game_result::GameResult;
 use crate::gfx::background_stack;
 use crate::printer::WhiteVariWidthText;
 use crate::rng::next_u16_in;
@@ -7,9 +6,7 @@ use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
 use agb::display::object::{Object, Sprite, Tag};
 use agb::display::tile_data::TileData;
-use agb::display::tiled::{
-    RegularBackground, RegularBackgroundSize, TileFormat, TileSetting,
-};
+use agb::display::tiled::{RegularBackground, RegularBackgroundSize, TileFormat, TileSetting};
 use agb::display::{GraphicsFrame, Layer, Priority};
 use agb::fixnum::{num, vec2};
 use agb::input::{Button, ButtonController};
@@ -337,8 +334,6 @@ enum FlowPhase {
     WinCounting {
         empty_scan_pos: u16,
     },
-    Win(GameResult),
-    Lose(GameResult),
 }
 
 pub struct PipesState {
@@ -357,11 +352,11 @@ pub struct PipesState {
     difficulty: PipeDifficulty,
     rng: RandomNumberGenerator,
     flow: FlowPhase,
+    pending_result: Option<SceneAction>,
     score: i32,
     score_popups: [Option<ScorePopup>; MAX_SCORE_POPUPS],
     move_input_timer: u8,
     place_tile_layer: RegularBackground,
-    paused: bool,
 }
 
 impl PipesState {
@@ -438,8 +433,8 @@ impl PipesState {
             score: 0,
             score_popups: [None; MAX_SCORE_POPUPS],
             flow: FlowPhase::WaitingForFirstPipe(countdown),
+            pending_result: None,
             move_input_timer: 0,
-            paused: false,
         };
         state.init_tiles();
         state
@@ -572,30 +567,32 @@ impl PipesState {
         ) && !cell.horiz_full
             && !cell.vert_full
             && !self.is_cursor_cell_flowing();
-        if (is_empty || can_replace)&& let Some(tile_idx) = self.queue[0].empty_tile() {
-                let (tx, ty) = self.tile_coords(self.cursor_x as usize, self.cursor_y as usize);
-                set_meta_tile(&mut self.place_tile_layer, tx, ty, tile_idx);
-                if can_replace {
-                    self.tile_layer.set_tile(
-                        vec2(tx, ty),
-                        &bg::bg_pipe_parts.tiles,
-                        TileSetting::BLANK,
-                    );
-                    self.tile_layer.set_tile(
-                        vec2(tx + 1, ty),
-                        &bg::bg_pipe_parts.tiles,
-                        TileSetting::BLANK,
-                    );
-                    self.tile_layer.set_tile(
-                        vec2(tx, ty + 1),
-                        &bg::bg_pipe_parts.tiles,
-                        TileSetting::BLANK,
-                    );
-                    self.tile_layer.set_tile(
-                        vec2(tx + 1, ty + 1),
-                        &bg::bg_pipe_parts.tiles,
-                        TileSetting::BLANK,
-                    );
+        if (is_empty || can_replace)
+            && let Some(tile_idx) = self.queue[0].empty_tile()
+        {
+            let (tx, ty) = self.tile_coords(self.cursor_x as usize, self.cursor_y as usize);
+            set_meta_tile(&mut self.place_tile_layer, tx, ty, tile_idx);
+            if can_replace {
+                self.tile_layer.set_tile(
+                    vec2(tx, ty),
+                    &bg::bg_pipe_parts.tiles,
+                    TileSetting::BLANK,
+                );
+                self.tile_layer.set_tile(
+                    vec2(tx + 1, ty),
+                    &bg::bg_pipe_parts.tiles,
+                    TileSetting::BLANK,
+                );
+                self.tile_layer.set_tile(
+                    vec2(tx, ty + 1),
+                    &bg::bg_pipe_parts.tiles,
+                    TileSetting::BLANK,
+                );
+                self.tile_layer.set_tile(
+                    vec2(tx + 1, ty + 1),
+                    &bg::bg_pipe_parts.tiles,
+                    TileSetting::BLANK,
+                );
             }
         }
     }
@@ -642,7 +639,7 @@ impl PipesState {
         true
     }
 
-    fn start_flow(&mut self, sound_controller: &mut SoundController) {
+    fn start_flow(&mut self, sound_controller: &mut SoundController) -> Option<SceneAction> {
         let w = self.grid_w as usize;
         let h = self.grid_h as usize;
         for y in 0..h {
@@ -656,17 +653,16 @@ impl PipesState {
                         anim_frame: 0,
                         anim_timer: 0,
                     };
-                    return;
+                    return None;
                 }
             }
         }
         self.set_as_loss(sound_controller)
     }
 
-    fn set_as_loss(&mut self, sound_controller: &mut SoundController) {
-        sound_controller.play_sfx(SoundEffect::Lose);
+    fn set_as_loss(&mut self, sound_controller: &mut SoundController) -> Option<SceneAction> {
         self.clear_pipe_hint();
-        self.flow = FlowPhase::Lose(GameResult::new_lose());
+        Some(SceneAction::Lose)
     }
 
     fn advance_flow(
@@ -677,7 +673,7 @@ impl PipesState {
         anim_frame: u8,
         anim_timer: u8,
         sound_controller: &mut SoundController,
-    ) {
+    ) -> Option<SceneAction> {
         let new_timer = anim_timer + 1;
         if new_timer < self.difficulty.frames_per_fill_step() {
             if let FlowPhase::Flowing {
@@ -687,7 +683,7 @@ impl PipesState {
             {
                 *t = new_timer;
             }
-            return;
+            return None;
         }
 
         let kind = self.grid[y as usize * self.grid_w as usize + x as usize].kind;
@@ -704,7 +700,7 @@ impl PipesState {
                 anim_frame: new_frame,
                 anim_timer: 0,
             };
-            return;
+            return None;
         }
 
         let idx = y as usize * self.grid_w as usize + x as usize;
@@ -723,8 +719,7 @@ impl PipesState {
         let exit_dir = match kind.pipe_exit(enter_from) {
             Some(d) => d,
             None => {
-                self.set_as_loss(sound_controller);
-                return;
+                return self.set_as_loss(sound_controller);
             }
         };
 
@@ -737,9 +732,9 @@ impl PipesState {
                 self.clear_pipe_hint();
                 self.flow = FlowPhase::WinCounting { empty_scan_pos: 0 };
             } else {
-                self.set_as_loss(sound_controller);
+                return self.set_as_loss(sound_controller);
             }
-            return;
+            return None;
         }
 
         let next_idx = ny as usize * self.grid_w as usize + nx as usize;
@@ -755,8 +750,7 @@ impl PipesState {
         };
 
         if !can_enter || already_filled {
-            self.set_as_loss(sound_controller);
-            return;
+            return self.set_as_loss(sound_controller);
         }
 
         self.flow = FlowPhase::Flowing {
@@ -766,6 +760,8 @@ impl PipesState {
             anim_frame: 0,
             anim_timer: 0,
         };
+
+        None
     }
 }
 
@@ -791,22 +787,6 @@ impl PipesState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
-        if self.paused {
-            if button_controller.is_just_pressed(Button::Start) {
-                self.paused = false;
-            } else if button_controller.is_just_pressed(Button::Select) {
-                return Some(SceneAction::Menu);
-            }
-            return None;
-        }
-
-        if button_controller.is_just_pressed(Button::Start)
-            && !matches!(self.flow, FlowPhase::Lose(_) | FlowPhase::Win(_))
-        {
-            self.paused = true;
-            return None;
-        }
-
         for slot in &mut self.score_popups {
             if let Some(popup) = slot {
                 popup.y -= 1;
@@ -818,10 +798,7 @@ impl PipesState {
             }
         }
 
-        if !matches!(
-            self.flow,
-            FlowPhase::WinCounting { .. } | FlowPhase::Lose(_) | FlowPhase::Win(_)
-        ) {
+        if !matches!(self.flow, FlowPhase::WinCounting { .. }) {
             let w = self.grid_w;
             let h = self.grid_h;
             if self.move_input_timer > 0 {
@@ -891,29 +868,18 @@ impl PipesState {
                 } else {
                     if self.score > 0 {
                         self.clear_pipe_hint();
-                        sound_controller.play_sfx(SoundEffect::Win);
-                        self.flow = FlowPhase::Win(GameResult::new_win());
+                        return Some(SceneAction::Win);
                     } else {
-                        self.set_as_loss(sound_controller);
+                        return self.set_as_loss(sound_controller);
                     }
-                }
-            }
-            FlowPhase::Win(result) => {
-                self.flow = FlowPhase::Win(result.update());
-                if button_controller.is_just_pressed(Button::B) {
-                    return Some(SceneAction::Menu);
-                }
-            }
-            FlowPhase::Lose(result) => {
-                self.flow = FlowPhase::Lose(result.update());
-                if button_controller.is_just_pressed(Button::B) {
-                    return Some(SceneAction::Menu);
                 }
             }
             FlowPhase::Countdown(frames) => {
                 if *frames == 0 {
                     sound_controller.play_sfx(SoundEffect::Water);
-                    self.start_flow(sound_controller);
+                    if let Some(result) = self.start_flow(sound_controller) {
+                        return Some(result);
+                    }
                 } else {
                     self.flow = FlowPhase::Countdown(frames - 1);
                 }
@@ -925,46 +891,37 @@ impl PipesState {
                 anim_frame,
                 anim_timer,
             } => {
-                self.advance_flow(
+                if let Some(result) = self.advance_flow(
                     *x,
                     *y,
                     *enter_from,
                     *anim_frame,
                     *anim_timer,
                     sound_controller,
-                );
-                if button_controller.is_pressed(Button::R) && let FlowPhase::Flowing {
+                ) {
+                    return Some(result);
+                }
+                if button_controller.is_pressed(Button::R)
+                    && let FlowPhase::Flowing {
                         x,
                         y,
                         enter_from,
                         anim_frame,
                         anim_timer,
                     } = self.flow
-                    {
-                        self.advance_flow(
+                {
+                    for _ in 0..3 {
+                        if let Some(result) = self.advance_flow(
                             x,
                             y,
                             enter_from,
                             anim_frame,
                             anim_timer,
                             sound_controller,
-                        );
-                        self.advance_flow(
-                            x,
-                            y,
-                            enter_from,
-                            anim_frame,
-                            anim_timer,
-                            sound_controller,
-                        );
-                        self.advance_flow(
-                            x,
-                            y,
-                            enter_from,
-                            anim_frame,
-                            anim_timer,
-                            sound_controller,
-                        );
+                        ) {
+                            return Some(result);
+                        }
+                    }
                 }
             }
         }
@@ -972,19 +929,11 @@ impl PipesState {
         None
     }
 
-    pub fn show(&mut self, frame: &mut GraphicsFrame) {
+    pub fn show(&mut self, frame: &mut GraphicsFrame, is_running: bool) {
         self.backgrounds[0].show(frame);
         self.backgrounds[1].show(frame);
         let tile_id = self.tile_layer.show(frame);
         let place_id = self.place_tile_layer.show(frame);
-
-        if let FlowPhase::Win(result) = &self.flow {
-            result.show(frame);
-        }
-
-        if let FlowPhase::Lose(result) = &self.flow {
-            result.show(frame);
-        }
 
         frame
             .blend()
@@ -992,10 +941,7 @@ impl PipesState {
             .enable_background(Layer::Top, place_id)
             .enable_background(Layer::Bottom, tile_id);
 
-        if !matches!(
-            self.flow,
-            FlowPhase::WinCounting { .. } | FlowPhase::Lose(_) | FlowPhase::Win(_)
-        ) {
+        if is_running && !matches!(self.flow, FlowPhase::WinCounting { .. }) {
             let (px, py) = self.pixel_coords(self.cursor_x as usize, self.cursor_y as usize);
             Object::new(CURSOR).set_pos(vec2(px, py)).show(frame);
         }
@@ -1024,10 +970,6 @@ impl PipesState {
             Object::new(popup.sprite)
                 .set_pos(vec2(popup.x as i32, popup.y as i32))
                 .show(frame);
-        }
-
-        if self.paused {
-            GameResult::Paused.show(frame);
         }
     }
 }
@@ -1082,8 +1024,10 @@ fn place_edge_pipe(
         if grid[y * w as usize + x].kind != PipeKind::Empty {
             continue;
         }
-        if let Some((ox, oy)) = min_dist_from &&  ox.abs_diff(x) + oy.abs_diff(y) < 5 {
-                continue;
+        if let Some((ox, oy)) = min_dist_from
+            && ox.abs_diff(x) + oy.abs_diff(y) < 5
+        {
+            continue;
         }
         grid[y * w as usize + x] = Cell {
             kind,

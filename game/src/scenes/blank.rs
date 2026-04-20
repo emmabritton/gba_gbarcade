@@ -1,10 +1,6 @@
 use crate::scenes::SceneAction;
 use crate::sound_controller::SoundController;
-use agb::display::tiled::{
-    DynamicTile16, RegularBackground, RegularBackgroundSize, TileEffect, TileFormat,
-};
-use agb::display::{GraphicsFrame, Priority};
-use agb::fixnum::vec2;
+use agb::display::GraphicsFrame;
 use agb::input::ButtonController;
 
 //used as placeholder when swapping scenes
@@ -29,7 +25,7 @@ impl BlankState {
         None
     }
 
-    pub fn show(&self, frame: &mut GraphicsFrame) {
-        
+    pub fn show(&self, _frame: &mut GraphicsFrame) {
+
     }
 }
