@@ -29,7 +29,7 @@ const FP_BOTTOM: FP = Num::from_raw(PLAY_BOTTOM << 8);
 const FP_W: FP = Num::from_raw((PLAY_RIGHT - PLAY_LEFT) << 8);
 const FP_H: FP = Num::from_raw((PLAY_BOTTOM - PLAY_TOP) << 8);
 
-const ROTATE_SPEED: Angle = num!(0.006);
+const ROTATE_SPEED: Angle = num!(0.01);
 const THRUST: FP = num!(0.06);
 const FRICTION: FP = num!(0.98);
 const MAX_SPEED_SQ: FP = num!(9.0);
