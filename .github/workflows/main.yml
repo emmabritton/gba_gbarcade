@@ -45,7 +45,7 @@ jobs:
         run: cargo build --release
 
       - name: build gba
-        run: agb-gbafix target/thumbv4t-none-eabi/release/gbarcade -o gbarcade_v0.1.0.gba -tGBArcade -cGAA1 -mEB -r10
+        run: agb-gbafix target/thumbv4t-none-eabi/release/gbarcade -o gbarcade_v0.1.0.gba -tGBArcade -cAGAE -mEB -r10
 
       - uses: softprops/action-gh-release@v1
         with:

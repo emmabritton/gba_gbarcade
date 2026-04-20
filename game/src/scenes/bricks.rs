@@ -48,14 +48,14 @@ const MAX_LIVES: u8 = 16;
 // Ball speed per level
 const BALL_SPEEDS: [Fp; 9] = [
     Num::from_raw(256),
-    Num::from_raw(307),
-    Num::from_raw(358),
-    Num::from_raw(409),
-    Num::from_raw(460),
-    Num::from_raw(512),
-    Num::from_raw(563),
-    Num::from_raw(614),
-    Num::from_raw(665),
+    Num::from_raw(287),
+    Num::from_raw(318),
+    Num::from_raw(349),
+    Num::from_raw(370),
+    Num::from_raw(402),
+    Num::from_raw(433),
+    Num::from_raw(474),
+    Num::from_raw(505),
 ];
 
 // Spawn probabilities for extra life brick

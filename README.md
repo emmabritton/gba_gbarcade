@@ -4,18 +4,29 @@ GBArcade is a collection of simple games for the GameBoy Advance, written in Rus
 
 ### Games
 
-- Minefield
+- Asteroids
+- Pipe Dream
 - Brick Break
+- Minesweeper
+- Space Invaders
 - Lights out
-- Pipes
-- Snake
-- Invaders
 
 ## Screenshots
 
+![Screenshot of main menu](https://raw.githubusercontent.com/emmabritton/gba_gbarcade/refs/heads/main/.github/screenshots/ss_menu.png)
+![Screenshot of asteroids](https://raw.githubusercontent.com/emmabritton/gba_gbarcade/refs/heads/main/.github/screenshots/ss_aster.png)
+![Screenshot of minesweeper](https://raw.githubusercontent.com/emmabritton/gba_gbarcade/refs/heads/main/.github/screenshots/ss_sweeper.png)
+![Screenshot of breakout](https://raw.githubusercontent.com/emmabritton/gba_gbarcade/refs/heads/main/.github/screenshots/ss_breakout.png)
+
 ## Player Usage
 
-Download gba file from [here](https://github.com/emmabritton/gbarcade/releases/latest) and run in an emulator (mGBA recommended)
+Download gba file from [here](https://github.com/emmabritton/gba_gbarcade/releases/latest) and run in an emulator (mGBA recommended)
+
+Doesn't support saving.
+
+## Example Cartridge
+
+https://shop.insidegadgets.com/product/gba-4mb-rom-only-flash-cart/
 
 ### Dev Usage
 
@@ -37,7 +48,7 @@ First follow instructions at https://agbrs.dev/book/setup/getting_started.html
 
 #### Make gba file
 
-`agb-gbafix target/thumbv4t-none-eabi/release/gb_arcade -o gb_arcade.gba`
+`agb-gbafix target/thumbv4t-none-eabi/release/gbarcade -o gbarcade.gba`
 
 ## Thanks/Tools
 
@@ -53,6 +64,9 @@ First follow instructions at https://agbrs.dev/book/setup/getting_started.html
 - abyssbox
   - https://choptop84.github.io/abyssbox-app/
   - Creating music and sound effects
+- Bfxr
+  - https://www.bfxr.net/
+  - Creating sound effects
 - audacity
   - https://www.audacityteam.org/
-  - Editing/encoding music
+  - Editing/encoding music/sound effects
