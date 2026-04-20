@@ -1,3 +1,7 @@
+# 0.1.2
+
+- Fix infinite speed bug in brick break
+
 # 0.1.1
 
 - Add ability to catch ball in brick break
