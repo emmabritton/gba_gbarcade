@@ -42,7 +42,6 @@ First follow instructions at https://agbrs.dev/book/setup/getting_started.html
 
 `cargo test --package game`
 `cargo test --package resources`  
-`cargo test --package game_logic`
 
 (runs in mGBA)
 
