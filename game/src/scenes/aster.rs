@@ -36,7 +36,7 @@ const MAX_SPEED_SQ: FP = num!(9.0);
 
 const BULLET_SPEED: FP = num!(3.5);
 const BULLET_LIFE: u16 = 80;
-const FIRE_COOLDOWN: u16 = 22;
+const FIRE_COOLDOWN: u16 = 20;
 const MAX_BULLETS: usize = 4;
 const MAX_ASTEROIDS: usize = 32;
 const MAX_POPUPS: usize = 8;
