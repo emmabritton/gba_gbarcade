@@ -47,7 +47,10 @@ First follow instructions at https://agbrs.dev/book/setup/getting_started.html
 
 #### Make gba file
 
-`agb-gbafix target/thumbv4t-none-eabi/release/gbarcade -o gbarcade.gba`
+```
+cargo build --release
+agb-gbafix target/thumbv4t-none-eabi/release/game -o gbarcade.gba
+```
 
 ## Thanks/Tools
 
