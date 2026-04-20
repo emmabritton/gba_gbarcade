@@ -330,6 +330,7 @@ impl BricksState {
                 self.launched = true;
                 self.show_level_badge = false;
                 self.launch_timer = POST_LAUNCH_DELAY_PER_LEVEL * self.level;
+                self.ball_vel = vec2(-1, -1);
             }
             return None;
         } else {
