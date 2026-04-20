@@ -1,5 +1,5 @@
 use crate::TILE_SIZE;
-use crate::gfx::background_stack;
+use crate::gfx::{background_stack, ShowTag};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -41,26 +41,31 @@ const LEVEL_NUMS: &Tag = &sprites::BRICKS_LVL_NUM;
 const LVL_BADGE_OFFSET: Vector2D<i32> = vec2(70, 90);
 const LVL_NUM_OFFSET: Vector2D<i32> = vec2(152, 90);
 
-const EXTRA_LIFE_FRAMES: u16 = 1800;
+const EXTRA_LIFE_FRAMES: u16 = 1800; //30s
 const EXTRA_LIFE_BLINK_SLOW: u16 = 1200; // 20s remaining
 const EXTRA_LIFE_BLINK_FAST: u16 = 600; // 10s remaining
 const EXTRA_LIFE_SIZE: Vector2D<i32> = vec2(32, 16);
 const MAX_LIVES: u8 = 16;
 
+const POST_LAUNCH_DELAY_PER_LEVEL: u8 = 16;
+
 // Ball speed per level
-const BALL_SPEEDS: [Fp; 9] = [
+const BALL_SPEEDS: [Fp; 12] = [
     Num::from_raw(256),
     Num::from_raw(287),
-    Num::from_raw(318),
-    Num::from_raw(349),
-    Num::from_raw(370),
-    Num::from_raw(402),
-    Num::from_raw(433),
-    Num::from_raw(474),
-    Num::from_raw(505),
+    Num::from_raw(328),
+    Num::from_raw(359),
+    Num::from_raw(390),
+    Num::from_raw(452),
+    Num::from_raw(493),
+    Num::from_raw(554),
+    Num::from_raw(605),
+    Num::from_raw(635),
+    Num::from_raw(665),
+    Num::from_raw(705),
 ];
 
-// Spawn probabilities for extra life brick
+// Spawn probabilities for extra life brick (higher chance when lower on life)
 const EXTRA_LIFE_DENOMS: [u16; 15] = [
     1000, 2357, 3714, 5071, 6428, 7785, 9142, 10500, 11857, 13214, 14571, 15928, 17285, 18642,
     20000,
@@ -124,6 +129,9 @@ pub struct BricksState {
     show_level_badge: bool,
     extra_life: Option<(Rect<i32>, u16)>,
     rng: RandomNumberGenerator,
+    trap_active: bool,
+    //must be 0 before trap can be activated
+    launch_timer: u8
 }
 
 // Row order: index 0 = top row (smallest y on screen), index 4 = bottom row.
@@ -186,7 +194,7 @@ fn make_bricks(level: u8) -> Vec<Brick> {
             BrickKind::Red,
             BrickKind::Orange,
         ],
-        9 => [
+        9|10|11|12 => [
             BrickKind::Red,
             BrickKind::Red,
             BrickKind::Red,
@@ -270,6 +278,8 @@ impl BricksState {
             show_level_badge: true,
             extra_life: None,
             rng: RandomNumberGenerator::new_with_seed(seed),
+            trap_active: false,
+            launch_timer: 0
         }
     }
 }
@@ -309,15 +319,21 @@ impl BricksState {
         }
         self.paddle_x = self.paddle_x.clamp(BOUNDS.position.x, max_x);
 
+        self.launch_timer = self.launch_timer.saturating_sub(1);
+
         if !self.launched {
+            self.trap_active = false;
             let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
             self.ball_pos.x = Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
             self.ball_pos.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
             if button_controller.is_just_pressed(Button::A) {
                 self.launched = true;
                 self.show_level_badge = false;
+                self.launch_timer = POST_LAUNCH_DELAY_PER_LEVEL * self.level;
             }
             return None;
+        } else {
+            self.trap_active = self.launch_timer == 0 && button_controller.is_pressed(Button::A);
         }
 
         let mut has_bounced = false;
@@ -331,6 +347,19 @@ impl BricksState {
         let ball_rect = self.ball_rect();
         let paddle_rect = self.paddle_rect();
         if self.ball_vel.y > 0 && paddle_rect.touches(ball_rect) {
+            if self.trap_active {
+                let start_x = self.paddle_x+8;
+                let end_x = start_x + (self.paddle_len as i32 * 8);
+                if (start_x..end_x).contains(&self.ball_pos.x.round()) {
+                    self.launched = false;
+                    return None;
+                }
+            }
+
+            if self.ball_pos.y.floor() > PADDLE_Y {
+                self.ball_vel.x *= 2;
+            }
+
             self.ball_pos.y = Fp::from(paddle_rect.top_left().y - BALL_SIZE.y);
 
             if next_u16_in(&mut self.rng, 0, 3) == 0 {
@@ -568,13 +597,18 @@ impl BricksState {
             .show(frame);
         for _ in 0..self.paddle_len {
             x += TILE_SIZE;
-            Object::new(BRICK_PADDLE_M.sprite(0))
-                .set_pos(vec2(x, PADDLE_Y))
-                .show(frame);
+            BRICK_PADDLE_M.show(0, vec2(x,PADDLE_Y),frame);
         }
         self.paddle_cap_objs[1]
             .set_pos(vec2(x + TILE_SIZE, PADDLE_Y))
             .show(frame);
+
+        if self.trap_active {
+            let y = PADDLE_Y - 8;
+            for i in 0..self.paddle_len {
+                sprites::BRICK_TRAP.show(0,vec2(self.paddle_x +8+ (i as i32 * 8),y), frame);
+            }
+        }
 
         let life_start_x = WIDTH - (LIFE_STRIDE * self.lives as i32);
         for i in 0..self.lives as i32 {
