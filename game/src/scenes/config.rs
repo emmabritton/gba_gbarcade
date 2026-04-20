@@ -25,9 +25,9 @@ pub enum OptionPx {
     Six([i32; 2], [i32; 3]),
 }
 
-const PX_THREE: OptionPx = OptionPx::Three(70, [50, 110, 170]);
-const PX_FOUR: OptionPx = OptionPx::Four([50, 100], [70, 150]);
-const PX_SIX: OptionPx = OptionPx::Six([50, 100], [50, 110, 170]);
+const PX_THREE: OptionPx = OptionPx::Three(70, [44, 104, 164]);
+const PX_FOUR: OptionPx = OptionPx::Four([50, 100], [64, 144]);
+const PX_SIX: OptionPx = OptionPx::Six([50, 100], [44, 104, 164]);
 
 impl ConfigMode {
     pub fn create_cursor(self) -> MenuCursor {
@@ -91,6 +91,14 @@ impl ConfigMode {
             ConfigMode::LightsOut => (&sprites::CFG_LOGO_LIGHTS_OUT, 3),
         }
     }
+
+    pub fn logo_width(self) -> i32 {
+        match self {
+            ConfigMode::Sweeper => 50,
+            ConfigMode::Pipes => 38,
+            ConfigMode::LightsOut => 91,
+        }
+    }
 }
 
 pub struct ConfigState {
@@ -136,7 +144,7 @@ impl ConfigState {
         self.grid_bg.show(frame);
 
         let (tag, count) = self.mode.logo();
-        let x = (WIDTH / 2) - ((count as i32 * 32) / 2);
+        let x = (WIDTH / 2) - (self.mode.logo_width()/2);
         let y = 16;
         for i in 0..count {
             let spr_x = x + (i as i32 * 32);

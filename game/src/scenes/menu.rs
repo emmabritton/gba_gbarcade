@@ -121,7 +121,7 @@ impl MenuState {
 
     pub fn show(&mut self, frame: &mut GraphicsFrame) {
         self.grid_bg.show(frame);
-        let title_start_x = 60;
+        let title_start_x = 58;
         let title_y = 8;
         let title_tile_width = 32;
         for x in 0..4 {
