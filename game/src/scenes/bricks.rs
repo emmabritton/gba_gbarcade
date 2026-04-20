@@ -42,6 +42,8 @@ const LVL_BADGE_OFFSET: Vector2D<i32> = vec2(70, 90);
 const LVL_NUM_OFFSET: Vector2D<i32> = vec2(152, 90);
 
 const EXTRA_LIFE_FRAMES: u16 = 1800;
+const EXTRA_LIFE_BLINK_SLOW: u16 = 1200; // 20s remaining
+const EXTRA_LIFE_BLINK_FAST: u16 = 600; // 10s remaining
 const EXTRA_LIFE_SIZE: Vector2D<i32> = vec2(32, 16);
 const MAX_LIVES: u8 = 16;
 
@@ -543,8 +545,17 @@ impl BricksState {
                 .show(frame);
         }
 
-        if let Some((rect, _)) = self.extra_life {
-            self.extra_life_obj.set_pos(rect.position).show(frame);
+        if let Some((rect, frames)) = self.extra_life {
+            let visible = if frames <= EXTRA_LIFE_BLINK_FAST {
+                frames & 8 != 0
+            } else if frames <= EXTRA_LIFE_BLINK_SLOW {
+                frames & 16 != 0
+            } else {
+                true
+            };
+            if visible {
+                self.extra_life_obj.set_pos(rect.position).show(frame);
+            }
         }
 
         self.ball_obj
