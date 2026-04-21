@@ -12,6 +12,8 @@ use crate::sound_controller::SoundController;
 use agb::display::GraphicsFrame;
 use agb::input::{Button, ButtonController};
 
+const RETURN_TO_MENU_TIMER: u8 = 16;
+
 pub mod aster;
 pub mod blank;
 pub mod bricks;
@@ -85,6 +87,7 @@ impl SceneKind {
 pub struct SceneHost {
     kind: SceneKind,
     game_result: GameHostState,
+    select_held_timer: u8,
 }
 
 impl SceneHost {
@@ -120,6 +123,7 @@ impl SceneHost {
         Self {
             kind,
             game_result: GameHostState::Running,
+            select_held_timer: 0,
         }
     }
 }
@@ -149,15 +153,24 @@ impl SceneHost {
             if self.game_result == GameHostState::Paused {
                 if button_controller.is_just_pressed(Button::Start) {
                     self.game_result = GameHostState::Running;
-                } else if button_controller.is_just_pressed(Button::Select) {
-                    return Some(SceneAction::Menu);
+                } else if button_controller.is_pressed(Button::Select) {
+                    self.select_held_timer += 1;
+                    if self.select_held_timer > RETURN_TO_MENU_TIMER {
+                        return Some(SceneAction::Menu);
+                    }
+                } else {
+                    self.select_held_timer = 0;
                 }
                 return None;
+            } else {
+                self.select_held_timer = 0;
             }
             if button_controller.is_just_pressed(Button::Start) {
                 self.game_result = GameHostState::Paused;
                 return None;
             }
+        } else {
+            self.select_held_timer = 0;
         }
 
         match self.kind.update(button_controller, sound_controller) {

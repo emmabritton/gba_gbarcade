@@ -64,6 +64,12 @@ include_background_gfx!(
     bg_light_out_cell => deduplicate "gfx/bg_light_out_cell.aseprite",
     bg_pipes_sml => deduplicate "gfx/bg_pipe_sml.aseprite",
     bg_pipes_lrg => deduplicate "gfx/bg_pipe_lrg.aseprite",
+    bg_help_aster => deduplicate "gfx/bg_help_aster.aseprite",
+    bg_help_invaders => deduplicate "gfx/bg_help_invaders.aseprite",
+    bg_help_brick => deduplicate "gfx/bg_help_brick.aseprite",
+    bg_help_lights => deduplicate "gfx/bg_help_lights.aseprite",
+    bg_help_pipe => deduplicate "gfx/bg_help_pipe.aseprite",
+    bg_help_sweeper => deduplicate "gfx/bg_help_sweeper.aseprite",
 );
 
 pub static SFX_BRICK_DAMAGE: SoundData = include_wav!("sfx/brick_damage.wav");

@@ -1,9 +1,11 @@
-use crate::gfx::{ShowSprite, ShowTag};
+use crate::gfx::{ShowSprite, ShowTag, background};
 use crate::grid_background::GridBackground;
 use crate::menu_cursor::MenuCursor;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
 use agb::display::object::{Sprite, Tag};
+use agb::display::tile_data::TileData;
+use agb::display::tiled::RegularBackground;
 use agb::display::{GraphicsFrame, Priority};
 use agb::fixnum::vec2;
 use agb::input::{Button, ButtonController};
@@ -35,6 +37,14 @@ const BUTTON_ACTION: [[SceneAction; 3]; 2] = [
         SceneAction::LightsConfig,
     ],
 ];
+const HELP: [[&TileData; 3]; 2] = [
+    [&bg::bg_help_aster, &bg::bg_help_pipe, &bg::bg_help_brick],
+    [
+        &bg::bg_help_sweeper,
+        &bg::bg_help_invaders,
+        &bg::bg_help_lights,
+    ],
+];
 const SPRITE_HIGHLIGHT: &Sprite = MENU_BUTTON_HIGHLIGHT.sprite(0);
 const TAG_TITLE: &Tag = &MENU_LOGO;
 const BUTTON_COLS: [i32; 3] = [16, 88, 160];
@@ -63,6 +73,7 @@ pub struct MenuState {
     grid_bg: GridBackground,
     cursor: MenuCursor,
     pending_action: Option<PendingAction>,
+    help_layer: Option<RegularBackground>,
 }
 
 impl MenuState {
@@ -74,6 +85,7 @@ impl MenuState {
                 (BUTTON_ROWS.len() * BUTTON_COLS.len()) as u8,
             ),
             pending_action: None,
+            help_layer: None,
         }
     }
 }
@@ -84,27 +96,48 @@ impl MenuState {
         button_controller: &mut ButtonController,
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
-        self.grid_bg.update();
-
-        if let Some(pending) = &mut self.pending_action {
-            if pending.frame_counter > 0 {
-                pending.frame_counter -= 1;
-                if pending.visible_countdown > 0 {
-                    pending.visible_countdown -= 1;
-                } else {
-                    pending.is_visible = !pending.is_visible;
-                    pending.visible_countdown = VISIBLE_COUNTDOWN;
-                }
-            } else {
-                return Some(pending.action);
+        if self.help_layer.is_some() {
+            if button_controller.is_just_pressed(
+                Button::A
+                    | Button::B
+                    | Button::L
+                    | Button::R
+                    | Button::Start
+                    | Button::Select
+                    | Button::Up
+                    | Button::Down
+                    | Button::Left
+                    | Button::Right,
+            ) {
+                self.help_layer = None;
             }
         } else {
-            self.cursor.update(button_controller, sound_controller);
+            self.grid_bg.update();
 
-            if button_controller.is_just_pressed(Button::A) {
-                sound_controller.play_sfx(SoundEffect::Select);
-                let (col, row) = self.cursor.pos_usize();
-                self.pending_action = Some(PendingAction::new(BUTTON_ACTION[row][col]))
+            if let Some(pending) = &mut self.pending_action {
+                if pending.frame_counter > 0 {
+                    pending.frame_counter -= 1;
+                    if pending.visible_countdown > 0 {
+                        pending.visible_countdown -= 1;
+                    } else {
+                        pending.is_visible = !pending.is_visible;
+                        pending.visible_countdown = VISIBLE_COUNTDOWN;
+                    }
+                } else {
+                    return Some(pending.action);
+                }
+            } else {
+                self.cursor.update(button_controller, sound_controller);
+
+                if button_controller.is_just_pressed(Button::A) {
+                    sound_controller.play_sfx(SoundEffect::Select);
+                    let (col, row) = self.cursor.pos_usize();
+                    self.pending_action = Some(PendingAction::new(BUTTON_ACTION[row][col]))
+                } else if button_controller.is_just_pressed(Button::Select) {
+                    let (col, row) = self.cursor.pos_usize();
+                    let bg = background(HELP[row][col], Priority::P1);
+                    self.help_layer = Some(bg);
+                }
             }
         }
         None
@@ -120,28 +153,32 @@ impl MenuState {
     }
 
     pub fn show(&mut self, frame: &mut GraphicsFrame) {
-        self.grid_bg.show(frame);
-        let title_start_x = 58;
-        let title_y = 8;
-        let title_tile_width = 32;
-        for x in 0..4 {
-            TAG_TITLE.show(
-                x,
-                vec2(title_start_x + (x as i32 * title_tile_width), title_y),
-                frame,
-            );
-        }
+        if let Some(bg) = &self.help_layer {
+            bg.show(frame);
+        } else {
+            self.grid_bg.show(frame);
+            let title_start_x = 58;
+            let title_y = 8;
+            let title_tile_width = 32;
+            for x in 0..4 {
+                TAG_TITLE.show(
+                    x,
+                    vec2(title_start_x + (x as i32 * title_tile_width), title_y),
+                    frame,
+                );
+            }
 
-        let (col, row) = self.cursor.pos_usize();
-        let pos = vec2(BUTTON_COLS[col], BUTTON_ROWS[row]);
-        if self.is_cursor_visible() {
-            SPRITE_HIGHLIGHT.show(pos, frame);
-        }
+            let (col, row) = self.cursor.pos_usize();
+            let pos = vec2(BUTTON_COLS[col], BUTTON_ROWS[row]);
+            if self.is_cursor_visible() {
+                SPRITE_HIGHLIGHT.show(pos, frame);
+            }
 
-        for (y, row) in SPRITE_BUTTON_LOGOS.iter().enumerate() {
-            for (x, sprite) in row.iter().enumerate() {
-                let pos = vec2(BUTTON_COLS[x], BUTTON_ROWS[y]);
-                sprite.show(pos, frame);
+            for (y, row) in SPRITE_BUTTON_LOGOS.iter().enumerate() {
+                for (x, sprite) in row.iter().enumerate() {
+                    let pos = vec2(BUTTON_COLS[x], BUTTON_ROWS[y]);
+                    sprite.show(pos, frame);
+                }
             }
         }
     }

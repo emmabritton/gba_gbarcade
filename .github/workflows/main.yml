@@ -45,10 +45,10 @@ jobs:
         run: cargo build --release
 
       - name: build gba
-        run: agb-gbafix target/thumbv4t-none-eabi/release/game -o gbarcade_v0.1.2.gba -tGBArcade -cAGAE -mEB -r12
+        run: agb-gbafix target/thumbv4t-none-eabi/release/game -o gbarcade_v0.1.3.gba -tGBArcade -cAGAE -mEB -r13
 
       - uses: softprops/action-gh-release@v1
         with:
-          files: gbarcade_v0.1.2.gba
+          files: gbarcade_v0.1.3.gba
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
