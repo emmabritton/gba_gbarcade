@@ -67,7 +67,6 @@ const SPRITE_SCORE_BULLET: &Sprite = sprites::ASTER_SCORE_FIRE.sprite(0);
 const SPRITE_SCORE_DEATH: &Sprite = sprites::ASTER_SCORE_DEATH.sprite(0);
 const TAG_DEATH: &Tag = &sprites::ASTER_DEATH;
 const SPRITE_BULLET: &Sprite = sprites::ASTER_BULLET.sprite(0);
-const SPRITE_LIFE: &Sprite = sprites::ASTER_LIFE.sprite(0);
 const SPRITE_UFO: &Sprite = sprites::ASTER_UFO.sprite(0);
 const TAG_ASTEROIDS_SMALL: &Tag = &sprites::ASTER_ROID_SMALL;
 const TAG_ASTEROIDS_MEDIUM: &Tag = &sprites::ASTER_ROID_MEDIUM;
@@ -337,14 +336,6 @@ impl AsterState {
             };
         }
     }
-
-    fn respawn_player(&mut self) {
-        self.player_pos = Vector2D::new(Num::from_raw(CENTER_X << 8), Num::from_raw(CENTER_Y << 8));
-        self.player_vel = Vector2D::new(num!(0), num!(0));
-        self.player_angle = num!(0);
-        self.bullets = [Bullet::NONE; MAX_BULLETS];
-        self.fire_cooldown = 0;
-    }
 }
 
 impl AsterState {
@@ -359,7 +350,7 @@ impl AsterState {
                 None
             } else {
                 Some(SceneAction::Lose)
-            }
+            };
         }
 
         if button_controller.is_pressed(Button::Left) {
@@ -521,38 +512,38 @@ impl AsterState {
         }
 
         // player collision
-            let px = self.player_pos.x.floor();
-            let py = self.player_pos.y.floor();
+        let px = self.player_pos.x.floor();
+        let py = self.player_pos.y.floor();
 
-            // vs asteroids
-            let mut player_hit = false;
-            for aster in &self.asteroids {
-                if !aster.active {
-                    continue;
-                }
-                let threshold = aster.size.radius() + 5;
-                if dist_sq(self.player_pos, aster.pos) < threshold * threshold {
-                    player_hit = true;
-                    break;
-                }
+        // vs asteroids
+        let mut player_hit = false;
+        for aster in &self.asteroids {
+            if !aster.active {
+                continue;
             }
+            let threshold = aster.size.radius() + 5;
+            if dist_sq(self.player_pos, aster.pos) < threshold * threshold {
+                player_hit = true;
+                break;
+            }
+        }
 
-            // vs ufo
-            if !player_hit && self.ufo_active {
-                let ufo_x = self.ufo_pos.x.floor();
-                let ufo_y = self.ufo_pos.y.floor();
-                if (px - ufo_x).abs() < UFO_W / 2 + 5 && (py - ufo_y).abs() < UFO_H / 2 + 5 {
-                    player_hit = true;
-                }
+        // vs ufo
+        if !player_hit && self.ufo_active {
+            let ufo_x = self.ufo_pos.x.floor();
+            let ufo_y = self.ufo_pos.y.floor();
+            if (px - ufo_x).abs() < UFO_W / 2 + 5 && (py - ufo_y).abs() < UFO_H / 2 + 5 {
+                player_hit = true;
             }
+        }
 
-            if player_hit {
-                self.death_pos = vec2(px, py);
-                self.state = GameState::PlayerDead;
-                self.state_timer = DEATH_ANIM_FRAMES + DEATH_PAUSE;
-                sound_controller.play_sfx(SoundEffect::InvaderPlayerDeath);
-                self.add_popup(self.player_pos, SPRITE_SCORE_DEATH, SCORE_DEATH);
-            }
+        if player_hit {
+            self.death_pos = vec2(px, py);
+            self.state = GameState::PlayerDead;
+            self.state_timer = DEATH_ANIM_FRAMES + DEATH_PAUSE;
+            sound_controller.play_sfx(SoundEffect::InvaderPlayerDeath);
+            self.add_popup(self.player_pos, SPRITE_SCORE_DEATH, SCORE_DEATH);
+        }
 
         for popup in &mut self.popups {
             if popup.active {
@@ -618,14 +609,14 @@ impl AsterState {
         // draw player
         match self.state {
             GameState::Playing => {
-                    let engine_power = if self.thrusting {
-                        1 + self.engine_frame
-                    } else {
-                        0
-                    };
-                    let px = self.player_pos.x.floor();
-                    let py = self.player_pos.y.floor();
-                    draw_player(vec2(px, py), self.player_angle, engine_power, frame);
+                let engine_power = if self.thrusting {
+                    1 + self.engine_frame
+                } else {
+                    0
+                };
+                let px = self.player_pos.x.floor();
+                let py = self.player_pos.y.floor();
+                draw_player(vec2(px, py), self.player_angle, engine_power, frame);
             }
             GameState::PlayerDead => {
                 let elapsed = (DEATH_ANIM_FRAMES + DEATH_PAUSE).saturating_sub(self.state_timer);
