@@ -51,14 +51,9 @@ const UFO_H: i32 = 32;
 
 const DEATH_ANIM_FRAMES: u16 = 20;
 const DEATH_PAUSE: u16 = 50;
-const INVINCIBLE_FRAMES: u16 = 120;
 const ENGINE_PERIOD: u8 = 5;
 
 const SAFE_SPAWN_DIST_SQ: i32 = 55 * 55;
-
-const LIFE_X0: i32 = 120;
-const LIFE_Y: i32 = 2;
-const LIFE_STRIDE: i32 = 9;
 
 const SCORE_BREAK: i32 = 100;
 const SCORE_SMALL: i32 = 200;
@@ -212,7 +207,6 @@ pub struct AsterState {
     thrusting: bool,
     engine_frame: usize,
     engine_timer: u8,
-    invincible: u16,
 
     bullets: [Bullet; MAX_BULLETS],
     fire_cooldown: u16,
@@ -223,8 +217,6 @@ pub struct AsterState {
     ufo_pos: Vector2D<FP>,
     ufo_dir: i32,
     ufo_timer: u16,
-
-    lives: u8,
 
     popups: [ScorePopup; MAX_POPUPS],
 
@@ -252,7 +244,6 @@ impl AsterState {
             thrusting: false,
             engine_frame: 0,
             engine_timer: 0,
-            invincible: 0,
             bullets: [Bullet::NONE; MAX_BULLETS],
             fire_cooldown: 0,
             asteroids: [Asteroid::NONE; MAX_ASTEROIDS],
@@ -260,7 +251,6 @@ impl AsterState {
             ufo_pos: Vector2D::new(num!(0), num!(0)),
             ufo_dir: 1,
             ufo_timer: UFO_INTERVAL,
-            lives: 3,
             popups: [ScorePopup::NONE; MAX_POPUPS],
             state: GameState::Playing,
             state_timer: 0,
@@ -354,7 +344,6 @@ impl AsterState {
         self.player_angle = num!(0);
         self.bullets = [Bullet::NONE; MAX_BULLETS];
         self.fire_cooldown = 0;
-        self.invincible = INVINCIBLE_FRAMES;
     }
 }
 
@@ -365,16 +354,12 @@ impl AsterState {
         sound_controller: &mut SoundController,
     ) -> Option<SceneAction> {
         if self.state == GameState::PlayerDead {
-            if self.state_timer > 0 {
+            return if self.state_timer > 0 {
                 self.state_timer -= 1;
-            } else if self.lives == 0 {
-                return Some(SceneAction::Lose);
+                None
             } else {
-                self.lives -= 1;
-                self.respawn_player();
-                self.state = GameState::Playing;
+                Some(SceneAction::Lose)
             }
-            return None;
         }
 
         if button_controller.is_pressed(Button::Left) {
@@ -536,7 +521,6 @@ impl AsterState {
         }
 
         // player collision
-        if self.invincible == 0 {
             let px = self.player_pos.x.floor();
             let py = self.player_pos.y.floor();
 
@@ -569,9 +553,6 @@ impl AsterState {
                 sound_controller.play_sfx(SoundEffect::InvaderPlayerDeath);
                 self.add_popup(self.player_pos, SPRITE_SCORE_DEATH, SCORE_DEATH);
             }
-        } else {
-            self.invincible -= 1;
-        }
 
         for popup in &mut self.popups {
             if popup.active {
@@ -602,12 +583,6 @@ impl AsterState {
         self.bg_fore.show(frame);
 
         WhiteVariWidthText::new(&format!("Score: {: >5}", self.score), 0).show(vec2(180, 1), frame);
-
-        for i in 0..self.lives as i32 {
-            Object::new(SPRITE_LIFE)
-                .set_pos(vec2(LIFE_X0 + i * LIFE_STRIDE, LIFE_Y))
-                .show(frame);
-        }
 
         for aster in &self.asteroids {
             if !aster.active {
@@ -643,8 +618,6 @@ impl AsterState {
         // draw player
         match self.state {
             GameState::Playing => {
-                let visible = self.invincible == 0 || (self.invincible / 4).is_multiple_of(2);
-                if visible {
                     let engine_power = if self.thrusting {
                         1 + self.engine_frame
                     } else {
@@ -653,7 +626,6 @@ impl AsterState {
                     let px = self.player_pos.x.floor();
                     let py = self.player_pos.y.floor();
                     draw_player(vec2(px, py), self.player_angle, engine_power, frame);
-                }
             }
             GameState::PlayerDead => {
                 let elapsed = (DEATH_ANIM_FRAMES + DEATH_PAUSE).saturating_sub(self.state_timer);

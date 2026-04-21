@@ -1,5 +1,6 @@
 # 0.1.3
 
+- Remove lives from asteroids
 - Add help screens (press select on menu)
 - Change to require holding select to return to main menu from pause menu
 
