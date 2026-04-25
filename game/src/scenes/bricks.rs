@@ -48,7 +48,7 @@ const FLIP_OFFSET: Vector2D<i32> = vec2(16, 0);
 const BALL_SIZE: Vector2D<i32> = vec2(4, 4);
 const BRICK_OFFSET: Vector2D<i32> = vec2(2, 3);
 
-const LIFE_COUNT: i32 = 6;
+const LIFE_COUNT: i32 = 8;
 const LIFE_Y: i32 = 4;
 const LIFE_STRIDE: i32 = 8;
 
@@ -266,15 +266,16 @@ impl BricksState {
             Object::new(BRICK_PADDLE_R.sprite(0)),
         ];
 
+        let paddle_len = 3;
         let paddle_x = 140;
-        let paddle_w = (1 + 2) * TILE_SIZE;
+        let paddle_w = (paddle_len + 2) * TILE_SIZE;
         let initial_pos = vec2(
             Fp::from(paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1)),
             Fp::from(PADDLE_Y - BALL_SIZE.y),
         );
 
         Self {
-            paddle_len: 3,
+            paddle_len: paddle_len as u8,
             paddle_x,
             launched: false,
             bricks: make_bricks(1),
@@ -575,8 +576,10 @@ impl BricksState {
             }
         } else if !self.empty_slots.is_empty() {
             let rand_num = next_u16_in(&mut self.rng, 0, 10000);
-            let denom = EXTRA_LIFE_DENOMS[(self.lives - 1) as usize];
-            let life = self.lives < MAX_LIVES && next_u16_in(&mut self.rng, 0, denom - 1) == 1;
+            let life = self.lives < MAX_LIVES && {
+                let denom = EXTRA_LIFE_DENOMS[(self.lives - 1) as usize];
+                next_u16_in(&mut self.rng, 0, denom - 1) == 1
+            };
             let paddle = self.paddle_len < MAX_LEN && rand_num == 1;
             let ball = rand_num < 5;
 
@@ -624,6 +627,7 @@ impl BricksState {
                 }
                 pos2.y = Fp::from(paddle_rect.top_left().y - BALL_SIZE.y);
                 vel2.y = -vel2.y.abs();
+                sound_controller.play_sfx(SoundEffect::BrickBounce);
             }
 
             check_brick_collision(
@@ -654,7 +658,7 @@ impl BricksState {
         self.extra_balls.extend(surviving_balls);
 
         if self.bricks.is_empty() {
-            if self.level >= 9 {
+            if self.level >= 12 {
                 return Some(SceneAction::Win);
             } else {
                 self.level += 1;
