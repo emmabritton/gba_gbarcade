@@ -1,3 +1,11 @@
+# 0.1.4
+
+- L/R now also works in Asteroids
+- In Brick Break:
+  - Paddle now takes a moment to reach full speed
+  - Paddle direction and speed affects the ball
+  - Added grow paddle and multi ball power ups
+
 # 0.1.3
 
 - Remove lives from asteroids
