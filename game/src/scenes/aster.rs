@@ -353,10 +353,9 @@ impl AsterState {
             };
         }
 
-        if button_controller.is_pressed(Button::Left) {
+        if button_controller.is_pressed(Button::Left | Button::L) {
             self.player_angle += ROTATE_SPEED;
-        }
-        if button_controller.is_pressed(Button::Right) {
+        } else if button_controller.is_pressed(Button::Right | Button::R) {
             self.player_angle -= ROTATE_SPEED;
         }
 
