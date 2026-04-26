@@ -94,7 +94,8 @@ pub static SFX_WATER: SoundData = include_wav!("sfx/water.wav");
 pub static SFX_WIN: SoundData = include_wav!("sfx/win.wav");
 pub static SFX_LOSE: SoundData = include_wav!("sfx/lost.wav");
 pub static SFX_LEVEL_UP: SoundData = include_wav!("sfx/level_up.wav");
-pub static SFX_EXTRA_LIFE: SoundData = include_wav!("sfx/extra_life.wav");
+pub static SFX_POWER_UP: SoundData = include_wav!("sfx/extra_life.wav");
+pub static SFX_CHEAT: SoundData = include_wav!("sfx/cheat.wav");
 
 pub mod prelude {
     pub use crate::bg;

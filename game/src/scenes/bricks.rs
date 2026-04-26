@@ -405,6 +405,25 @@ impl BricksState {
 }
 
 impl BricksState {
+    pub fn cheat(&mut self) {
+        if !self.launched {
+            self.launched = true;
+            self.show_level_badge = false;
+            self.launch_timer = POST_LAUNCH_DELAY_PER_LEVEL * self.level;
+            self.extra_balls[0].1 = vec2(-1, -1);
+        }
+        let pos = self.extra_balls[0].0;
+        for _ in 0..5 {
+            let x: i32 = match next_u16_in(&mut self.rng, 0, 3) {
+                0 => -2,
+                1 => -1,
+                2 => 1,
+                _ => 2,
+            };
+            self.extra_balls.push((pos, vec2(x, -1)));
+        }
+    }
+    
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,
@@ -571,7 +590,7 @@ impl BricksState {
                                 self.extra_balls.push((pos, vec2(second_x, -1)));
                             }
                         }
-                        sound_controller.play_sfx(SoundEffect::ExtraLife);
+                        sound_controller.play_sfx(SoundEffect::PowerUp);
                         self.powerup = None;
                     } else if frames == 0 {
                         self.powerup = None;

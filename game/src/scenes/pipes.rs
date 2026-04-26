@@ -779,6 +779,10 @@ fn not_neighbours(center: (usize, usize), start: (usize, usize), end: (usize, us
 }
 
 impl PipesState {
+    pub fn cheat(&mut self) {
+        self.flow = FlowPhase::Countdown(self.difficulty.fill_delay());
+    }
+
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,

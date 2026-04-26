@@ -147,6 +147,12 @@ impl LightsOutState {
 }
 
 impl LightsOutState {
+    pub fn cheat(
+        &mut self
+    ) {
+        self.grid.iter_mut().for_each(|v| *v = !*v);
+    }
+
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,

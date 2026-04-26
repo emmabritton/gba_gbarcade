@@ -1,10 +1,17 @@
 # 0.1.4
 
-- L/R now also works in Asteroids
+- You now hold A in asteroids to automatically fire at a slightly slower rate
 - In Brick Break:
   - Paddle now takes a moment to reach full speed
   - Paddle direction and speed affects the ball
   - Added grow paddle and multi ball power ups
+- Added cheats, hold SELECT and press L, R, L, R to
+  - Brick break: spawn 5 balls
+  - Asteroids: gun doubles firing speed
+  - Pipe: reset flow timer
+  - Minefield: reveal a mine
+  - Invaders: gain an extra life 
+  - Lights out: toggle all lights
 
 # 0.1.3
 

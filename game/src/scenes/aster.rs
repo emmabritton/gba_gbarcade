@@ -37,7 +37,8 @@ const MAX_SPEED_SQ: FP = num!(9.0);
 const BULLET_SPEED: FP = num!(3.5);
 const BULLET_LIFE: u16 = 80;
 const FIRE_COOLDOWN: u16 = 20;
-const MAX_BULLETS: usize = 4;
+const FAST_FIRE_COOLDOWN: u16 = 7;
+const MAX_BULLETS: usize = 12;
 const MAX_ASTEROIDS: usize = 32;
 const MAX_POPUPS: usize = 8;
 
@@ -223,6 +224,7 @@ pub struct AsterState {
     state_timer: u16,
     death_pos: Vector2D<i32>,
     score: i32,
+    fast_fire: bool,
 }
 
 impl AsterState {
@@ -255,6 +257,7 @@ impl AsterState {
             state_timer: 0,
             death_pos: vec2(CENTER_X, CENTER_Y),
             score: 0,
+            fast_fire: false,
         };
 
         state.spawn_initial_asteroids();
@@ -339,6 +342,10 @@ impl AsterState {
 }
 
 impl AsterState {
+    pub fn cheat(&mut self) {
+        self.fast_fire = true;
+    }
+    
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,
@@ -375,7 +382,7 @@ impl AsterState {
 
         // Fire
         self.fire_cooldown = self.fire_cooldown.saturating_sub(1);
-        if button_controller.is_just_pressed(Button::A)
+        if button_controller.is_pressed(Button::A)
             && self.fire_cooldown == 0
             && let Some(slot) = self.bullets.iter().position(|b| !b.active)
         {
@@ -386,7 +393,8 @@ impl AsterState {
                 life: BULLET_LIFE,
                 active: true,
             };
-            self.fire_cooldown = FIRE_COOLDOWN;
+            let base = if self.fast_fire { FAST_FIRE_COOLDOWN } else { FIRE_COOLDOWN };
+            self.fire_cooldown = base + if button_controller.is_just_pressed(Button::A) { 0 } else { 2 };
             sound_controller.play_sfx(SoundEffect::Place);
             self.add_popup(self.player_pos, SPRITE_SCORE_BULLET, SCORE_BULLET);
         }

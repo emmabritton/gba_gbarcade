@@ -8,7 +8,7 @@ use crate::scenes::lights_out::{LightGridSize, LightsOutState};
 use crate::scenes::menu::MenuState;
 use crate::scenes::pipes::{PipeDifficulty, PipesState};
 use crate::scenes::sweeper::{SweeperGridSize, SweeperState};
-use crate::sound_controller::SoundController;
+use crate::sound_controller::{SoundController, SoundEffect};
 use agb::display::GraphicsFrame;
 use agb::input::{Button, ButtonController};
 
@@ -82,12 +82,27 @@ impl SceneKind {
             SceneKind::Blank(s) => s.show(frame),
         }
     }
+    
+    fn cheat(&mut self) {
+        match self {
+            SceneKind::Menu(_) => {}
+            SceneKind::Pipes(s) =>s.cheat(),
+            SceneKind::Bricks(s) =>s.cheat(),
+            SceneKind::Aster(s) =>s.cheat(),
+            SceneKind::Sweeper(s) =>s.cheat(),
+            SceneKind::Invaders(s) =>s.cheat(),
+            SceneKind::LightsOut(s) =>s.cheat(),
+            SceneKind::Config(_) => {}
+            SceneKind::Blank(_) => {}
+        }
+    }
 }
 
 pub struct SceneHost {
     kind: SceneKind,
     game_result: GameHostState,
     select_held_timer: u8,
+    cheat_state: u8,
 }
 
 impl SceneHost {
@@ -124,6 +139,7 @@ impl SceneHost {
             kind,
             game_result: GameHostState::Running,
             select_held_timer: 0,
+            cheat_state: 0,
         }
     }
 }
@@ -164,6 +180,23 @@ impl SceneHost {
                 return None;
             } else {
                 self.select_held_timer = 0;
+                if button_controller.is_pressed(Button::Select) {
+                    if self.cheat_state == 0 || self.cheat_state == 2 {
+                        if button_controller.is_just_pressed(Button::L) {
+                            self.cheat_state += 1;
+                        }
+                    } else if button_controller.is_just_pressed(Button::R) {
+                        if self.cheat_state == 1 {
+                            self.cheat_state += 1;
+                        } else if self.cheat_state == 3 {
+                            self.kind.cheat();
+                            sound_controller.play_sfx(SoundEffect::Cheat);
+                            self.cheat_state = 0;
+                        } 
+                    }
+                } else {
+                    self.cheat_state = 0;
+                }
             }
             if button_controller.is_just_pressed(Button::Start) {
                 self.game_result = GameHostState::Paused;
@@ -172,7 +205,7 @@ impl SceneHost {
         } else {
             self.select_held_timer = 0;
         }
-
+        
         match self.kind.update(button_controller, sound_controller) {
             Some(SceneAction::Win) => {
                 self.game_result = GameHostState::new_win();

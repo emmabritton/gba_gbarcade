@@ -391,6 +391,28 @@ impl SweeperState {
 }
 
 impl SweeperState {
+    pub fn cheat(&mut self) {
+        if self.state != State::Playing {
+            return;
+        }
+        let total = self.width as usize * self.height as usize;
+        let mut candidates = [0u16; MAX_CELLS];
+        let mut count = 0;
+        for i in 0..total {
+            let cell = self.cells[i];
+            if cell.is_mine && !cell.is_flagged && !cell.is_revealed {
+                candidates[count] = i as u16;
+                count += 1;
+            }
+        }
+        if count == 0 {
+            return;
+        }
+        let pick = next_u16_in(&mut self.rng, 0, (count - 1) as u16) as usize;
+        self.cells[candidates[pick] as usize].is_flagged = true;
+        self.update_tiles();
+    }
+    
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,

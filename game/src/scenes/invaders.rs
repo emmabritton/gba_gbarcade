@@ -68,7 +68,6 @@ const UFO_INTERVAL: u16 = 1000;
 const UFO_SPEED: i32 = 1;
 
 const LIFE_Y: i32 = 0;
-const LIFE_X0: i32 = WIDTH - (LIFE_STRIDE * 3);
 const LIFE_STRIDE: i32 = 10;
 
 const DEAD_FRAMES: u8 = 30;
@@ -339,6 +338,10 @@ impl InvadersState {
         } else {
             *word &= !(1 << bit);
         }
+    }
+
+    pub fn cheat(&mut self) {
+        self.lives = self.lives.saturating_add(1).min(8);
     }
 
     pub fn update(
@@ -683,9 +686,10 @@ impl InvadersState {
                 .show(frame);
         }
 
+        let start_x = WIDTH - (self.lives as i32 * LIFE_STRIDE);
         for i in 0..self.lives as i32 {
             Object::new(sprites::INVADER_LIFE.sprite(0))
-                .set_pos(vec2(LIFE_X0 + i * LIFE_STRIDE, LIFE_Y))
+                .set_pos(vec2(start_x + i * LIFE_STRIDE, LIFE_Y))
                 .show(frame);
         }
     }

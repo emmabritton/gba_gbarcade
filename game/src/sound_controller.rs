@@ -41,7 +41,8 @@ impl<'gba> SoundController<'gba> {
             SoundEffect::Win => SFX_WIN,
             SoundEffect::Lose => SFX_LOSE,
             SoundEffect::LevelUp => SFX_LEVEL_UP,
-            SoundEffect::ExtraLife => SFX_EXTRA_LIFE,
+            SoundEffect::PowerUp => SFX_POWER_UP,
+            SoundEffect::Cheat => SFX_CHEAT,
         };
 
         let mut channel = SoundChannel::new(sound_data);
@@ -77,5 +78,6 @@ pub enum SoundEffect {
     Win,
     Lose,
     LevelUp,
-    ExtraLife,
+    PowerUp,
+    Cheat,
 }
