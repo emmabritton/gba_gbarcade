@@ -438,6 +438,13 @@ impl BricksState {
 
         self.launch_timer = self.launch_timer.saturating_sub(1);
 
+        let paddle_rect = self.paddle_rect();
+        let speed = self.ball_speed();
+        let left = BOUNDS.top_left().x;
+        let right = BOUNDS.bottom_right().x;
+        let top = BOUNDS.top_left().y;
+        let bottom = BOUNDS.bottom_right().y;
+
         if !self.launched {
             self.trap_active = false;
             let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
@@ -461,151 +468,154 @@ impl BricksState {
                 };
                 self.extra_balls[0].1 = vec2(x, -1);
             }
-            return None;
         } else {
             self.trap_active = self.launch_timer == 0 && button_controller.is_pressed(Button::A);
-        }
 
-        let mut has_bounced = false;
-        let mut pos = self.extra_balls[0].0;
-        let mut vel = self.extra_balls[0].1;
-        let prev_pos = vec2(pos.x.floor(), pos.y.floor());
+            let mut has_bounced = false;
+            let mut pos = self.extra_balls[0].0;
+            let mut vel = self.extra_balls[0].1;
+            let prev_pos = vec2(pos.x.floor(), pos.y.floor());
 
-        let speed = self.ball_speed();
-        pos.x += Fp::from(vel.x) * speed;
-        pos.y += Fp::from(vel.y) * speed;
+            pos.x += Fp::from(vel.x) * speed;
+            pos.y += Fp::from(vel.y) * speed;
 
-        let ball_rect = Rect::new(vec2(pos.x.floor(), pos.y.floor()), BALL_SIZE);
-        let paddle_rect = self.paddle_rect();
-        if vel.y > 0 && paddle_rect.touches(ball_rect) {
-            if self.trap_active {
-                let start_x = self.paddle_x + 8;
-                let end_x = start_x + (self.paddle_len as i32 * 8);
-                if (start_x..end_x).contains(&pos.x.round()) {
+            let ball_rect = Rect::new(vec2(pos.x.floor(), pos.y.floor()), BALL_SIZE);
+            if vel.y > 0 && paddle_rect.touches(ball_rect) {
+                let captured = self.trap_active && {
+                    let start_x = self.paddle_x + 8;
+                    let end_x = start_x + (self.paddle_len as i32 * 8);
+                    (start_x..end_x).contains(&pos.x.round())
+                };
+                if captured {
                     self.launched = false;
-                    return None;
+                    self.trap_active = false;
+                    let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
+                    self.extra_balls[0].0.x =
+                        Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
+                    self.extra_balls[0].0.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
+                } else {
+                    if pos.y.floor() > PADDLE_Y {
+                        vel.x *= 2;
+                    } else if let Some(dir) = self.paddle_dir {
+                        let sign: i32 = if dir { 1 } else { -1 };
+                        vel.x = sign
+                            * if self.paddle_speed > (PADDLE_MAX_SPEED >> 1) {
+                                2
+                            } else {
+                                1
+                            };
+                    } else if next_u16_in(&mut self.rng, 0, 3) == 0 {
+                        vel.x = -vel.x.abs();
+                    }
+                    pos.y = Fp::from(paddle_rect.top_left().y - BALL_SIZE.y);
+                    vel.y = -vel.y.abs();
+                    has_bounced = true;
                 }
             }
 
-            if pos.y.floor() > PADDLE_Y {
-                vel.x *= 2;
-            } else if let Some(dir) = self.paddle_dir {
-                let sign: i32 = if dir { 1 } else { -1 };
-                vel.x = sign
-                    * if self.paddle_speed > (PADDLE_MAX_SPEED >> 1) {
-                        2
+            if self.launched {
+                let hit_brick = check_brick_collision(
+                    &mut self.bricks,
+                    &mut self.empty_slots,
+                    &mut pos,
+                    &mut vel,
+                    prev_pos,
+                    sound_controller,
+                );
+
+                if pos.x.floor() < left {
+                    pos.x = Fp::from(left);
+                    vel.x *= -1;
+                    has_bounced = true;
+                } else if pos.x.floor() + BALL_SIZE.x > right {
+                    pos.x = Fp::from(right - BALL_SIZE.x);
+                    vel.x *= -1;
+                    has_bounced = true;
+                }
+
+                if pos.y.floor() < top {
+                    pos.y = Fp::from(top);
+                    vel.y *= -1;
+                    has_bounced = true;
+                } else if pos.y.floor() + BALL_SIZE.y > bottom {
+                    if self.extra_balls.len() > 1 {
+                        self.extra_balls.remove(0);
+                        pos = self.extra_balls[0].0;
+                        vel = self.extra_balls[0].1;
                     } else {
-                        1
-                    };
-            } else if next_u16_in(&mut self.rng, 0, 3) == 0 {
-                vel.x = -vel.x.abs();
-            }
-            pos.y = Fp::from(paddle_rect.top_left().y - BALL_SIZE.y);
-            vel.y = -vel.y.abs();
-            has_bounced = true;
-        }
-
-        let hit_brick = check_brick_collision(
-            &mut self.bricks,
-            &mut self.empty_slots,
-            &mut pos,
-            &mut vel,
-            prev_pos,
-            sound_controller,
-        );
-
-        let left = BOUNDS.top_left().x;
-        let right = BOUNDS.bottom_right().x;
-        let top = BOUNDS.top_left().y;
-        let bottom = BOUNDS.bottom_right().y;
-
-        if pos.x.floor() < left {
-            pos.x = Fp::from(left);
-            vel.x *= -1;
-            has_bounced = true;
-        } else if pos.x.floor() + BALL_SIZE.x > right {
-            pos.x = Fp::from(right - BALL_SIZE.x);
-            vel.x *= -1;
-            has_bounced = true;
-        }
-
-        if pos.y.floor() < top {
-            pos.y = Fp::from(top);
-            vel.y *= -1;
-            has_bounced = true;
-        } else if pos.y.floor() + BALL_SIZE.y > bottom {
-            if self.extra_balls.len() > 1 {
-                self.extra_balls.remove(0);
-                pos = self.extra_balls[0].0;
-                vel = self.extra_balls[0].1;
-            } else {
-                sound_controller.play_sfx(SoundEffect::BrickFloor);
-                self.lives = self.lives.saturating_sub(1);
-                if self.lives == 0 {
-                    return Some(SceneAction::Lose);
-                }
-                self.launched = false;
-                let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
-                pos.x = Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
-                pos.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
-            }
-        }
-
-        if has_bounced && !hit_brick {
-            sound_controller.play_sfx(SoundEffect::BrickBounce);
-        }
-
-        let current_ball_rect = Rect::new(vec2(pos.x.floor(), pos.y.floor()), BALL_SIZE);
-
-        if let Some((powerup, bounds, frames)) = self.powerup {
-            if current_ball_rect.touches(bounds) {
-                match powerup {
-                    Powerup::Life => self.lives += 1,
-                    Powerup::Paddle => self.paddle_len += 1,
-                    Powerup::Ball => {
-                        let second_x = if vel.x >= 0 { -1 } else { 1 };
-                        self.extra_balls.push((pos, vec2(second_x, -1)));
+                        sound_controller.play_sfx(SoundEffect::BrickFloor);
+                        self.lives = self.lives.saturating_sub(1);
+                        if self.lives == 0 {
+                            return Some(SceneAction::Lose);
+                        }
+                        self.launched = false;
+                        let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
+                        pos.x = Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
+                        pos.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
                     }
                 }
-                sound_controller.play_sfx(SoundEffect::ExtraLife);
-                self.powerup = None;
-            } else if frames == 0 {
-                self.powerup = None;
-            } else {
-                self.powerup = Some((powerup, bounds, frames - 1));
-            }
-        } else if !self.empty_slots.is_empty() {
-            let rand_num = next_u16_in(&mut self.rng, 0, 10000);
-            let life = self.lives < MAX_LIVES && {
-                let denom = EXTRA_LIFE_DENOMS[(self.lives - 1) as usize];
-                next_u16_in(&mut self.rng, 0, denom - 1) == 1
-            };
-            let paddle = self.paddle_len < MAX_LEN && rand_num == 1;
-            let ball = rand_num < 5;
 
-            let mut candidates = [Powerup::Life; 3];
-            let mut count = 0u16;
-            if life {
-                candidates[count as usize] = Powerup::Life;
-                count += 1;
-            }
-            if paddle {
-                candidates[count as usize] = Powerup::Paddle;
-                count += 1;
-            }
-            if ball {
-                candidates[count as usize] = Powerup::Ball;
-                count += 1;
-            }
-            if count > 0 {
-                let chosen = candidates[next_u16_in(&mut self.rng, 0, count - 1) as usize];
-                let slot_pos = self.empty_slots
-                    [next_u16_in(&mut self.rng, 0, (self.empty_slots.len() - 1) as u16) as usize];
-                self.powerup = Some((chosen, Rect::new(slot_pos, POWERUP_SIZE), POWERUP_FRAMES));
+                if has_bounced && !hit_brick {
+                    sound_controller.play_sfx(SoundEffect::BrickBounce);
+                }
+
+                let current_ball_rect = Rect::new(vec2(pos.x.floor(), pos.y.floor()), BALL_SIZE);
+
+                if let Some((powerup, bounds, frames)) = self.powerup {
+                    if current_ball_rect.touches(bounds) {
+                        match powerup {
+                            Powerup::Life => self.lives += 1,
+                            Powerup::Paddle => self.paddle_len += 1,
+                            Powerup::Ball => {
+                                let second_x = if vel.x >= 0 { -1 } else { 1 };
+                                self.extra_balls.push((pos, vec2(second_x, -1)));
+                            }
+                        }
+                        sound_controller.play_sfx(SoundEffect::ExtraLife);
+                        self.powerup = None;
+                    } else if frames == 0 {
+                        self.powerup = None;
+                    } else {
+                        self.powerup = Some((powerup, bounds, frames - 1));
+                    }
+                } else if !self.empty_slots.is_empty() {
+                    let rand_num = next_u16_in(&mut self.rng, 0, 10000);
+                    let life = self.lives < MAX_LIVES && {
+                        let denom = EXTRA_LIFE_DENOMS[(self.lives - 1) as usize];
+                        next_u16_in(&mut self.rng, 0, denom - 1) < 2
+                    };
+                    let paddle = self.paddle_len < MAX_LEN && rand_num == 1;
+                    let ball = rand_num < 3;
+
+                    let mut candidates = [Powerup::Life; 3];
+                    let mut count = 0u16;
+                    if life {
+                        candidates[count as usize] = Powerup::Life;
+                        count += 1;
+                    }
+                    if paddle {
+                        candidates[count as usize] = Powerup::Paddle;
+                        count += 1;
+                    }
+                    if ball {
+                        candidates[count as usize] = Powerup::Ball;
+                        count += 1;
+                    }
+                    if count > 0 {
+                        let chosen = candidates[next_u16_in(&mut self.rng, 0, count - 1) as usize];
+                        let slot_pos = self.empty_slots[next_u16_in(
+                            &mut self.rng,
+                            0,
+                            (self.empty_slots.len() - 1) as u16,
+                        ) as usize];
+                        self.powerup =
+                            Some((chosen, Rect::new(slot_pos, POWERUP_SIZE), POWERUP_FRAMES));
+                    }
+                }
+
+                self.extra_balls[0] = (pos, vel);
             }
         }
-
-        self.extra_balls[0] = (pos, vel);
 
         let secondary: Vec<_> = self.extra_balls.drain(1..).collect();
         let mut surviving_balls = vec![];
