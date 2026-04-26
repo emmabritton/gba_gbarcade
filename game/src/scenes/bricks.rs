@@ -680,6 +680,23 @@ impl BricksState {
                 pos2.y = Fp::from(top);
                 vel2.y *= -1;
             }
+
+            if let Some((powerup, bounds, _)) = self.powerup {
+                let ball_rect2 = Rect::new(vec2(pos2.x.floor(), pos2.y.floor()), BALL_SIZE);
+                if ball_rect2.touches(bounds) {
+                    match powerup {
+                        Powerup::Life => self.lives += 1,
+                        Powerup::Paddle => self.paddle_len += 1,
+                        Powerup::Ball => {
+                            let second_x = if vel2.x >= 0 { -1 } else { 1 };
+                            surviving_balls.push((pos2, vec2(second_x, -1)));
+                        }
+                    }
+                    sound_controller.play_sfx(SoundEffect::PowerUp);
+                    self.powerup = None;
+                }
+            }
+
             if !fallen {
                 surviving_balls.push((pos2, vel2));
             }
