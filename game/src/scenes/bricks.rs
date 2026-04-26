@@ -1,5 +1,6 @@
 use crate::TILE_SIZE;
 use crate::gfx::{ShowSprite, ShowTag, background_stack};
+use crate::progress::{Achievement, set_achievement};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -149,6 +150,7 @@ pub struct BricksState {
     trap_active: bool,
     //must be 0 before trap can be activated
     launch_timer: u8,
+    has_lost_ball: bool,
 }
 
 // Row order: index 0 = top row (smallest y on screen), index 4 = bottom row.
@@ -295,6 +297,7 @@ impl BricksState {
             rng: RandomNumberGenerator::new_with_seed(seed),
             trap_active: false,
             launch_timer: 0,
+            has_lost_ball: false,
         }
     }
 }
@@ -406,6 +409,7 @@ impl BricksState {
 
 impl BricksState {
     pub fn cheat(&mut self) {
+        set_achievement(Achievement::UsedCheatBricks);
         if !self.launched {
             self.launched = true;
             self.show_level_badge = false;
@@ -423,7 +427,7 @@ impl BricksState {
             self.extra_balls.push((pos, vec2(x, -1)));
         }
     }
-    
+
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,
@@ -568,6 +572,7 @@ impl BricksState {
                             return Some(SceneAction::Lose);
                         }
                         self.launched = false;
+                        self.has_lost_ball = true;
                         let paddle_w = (self.paddle_len as i32 + 2) * TILE_SIZE;
                         pos.x = Fp::from(self.paddle_x + (paddle_w >> 1) - (BALL_SIZE.x >> 1));
                         pos.y = Fp::from(PADDLE_Y - BALL_SIZE.y);
@@ -704,6 +709,20 @@ impl BricksState {
         self.extra_balls.extend(surviving_balls);
 
         if self.bricks.is_empty() {
+            match self.level {
+                3 => set_achievement(Achievement::BeatBricks3),
+                6 => set_achievement(Achievement::BeatBricks6),
+                9 => set_achievement(Achievement::BeatBricks9),
+                10 => set_achievement(Achievement::BeatBricks10),
+                11 => set_achievement(Achievement::BeatBricks11),
+                12 => {
+                    set_achievement(Achievement::BeatBricks12);
+                    if !self.has_lost_ball {
+                        set_achievement(Achievement::BeatBricks12WithoutLosingBall);
+                    }
+                }
+                _ => {}
+            }
             if self.level >= 12 {
                 return Some(SceneAction::Win);
             } else {

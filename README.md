@@ -24,6 +24,10 @@ Download gba file from [here](https://github.com/emmabritton/gba_gbarcade/releas
 
 Doesn't support saving.
 
+## RetroAchievements
+
+If you want to implement RetroAchievements for GBArcade, there's a helper value at 0x02000000, see progress.rs for the bit values
+
 ## Example Cartridge
 
 https://shop.insidegadgets.com/product/gba-4mb-rom-only-flash-cart/

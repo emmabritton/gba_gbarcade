@@ -9,6 +9,7 @@ mod gfx;
 pub mod grid_background;
 mod menu_cursor;
 mod printer;
+mod progress;
 mod rng;
 mod scenes;
 mod sound_controller;

@@ -1,4 +1,5 @@
 use crate::gfx::{ShowSprite, background};
+use crate::progress::{Achievement, set_achievement};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -392,6 +393,7 @@ impl SweeperState {
 
 impl SweeperState {
     pub fn cheat(&mut self) {
+        set_achievement(Achievement::UsedCheatSweeper);
         if self.state != State::Playing {
             return;
         }
@@ -412,7 +414,7 @@ impl SweeperState {
         self.cells[candidates[pick] as usize].is_flagged = true;
         self.update_tiles();
     }
-    
+
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,
@@ -425,6 +427,15 @@ impl SweeperState {
                 if frames_remaining > 0 {
                     self.state = State::CountingDownToWin(frames_remaining - 1);
                 } else {
+                    match (self.width, self.height) {
+                        (8, 8) => set_achievement(Achievement::BeatSweeper8x8),
+                        (12, 8) => set_achievement(Achievement::BeatSweeper12x8),
+                        (16, 8) => set_achievement(Achievement::BeatSweeper16x8),
+                        (12, 12) => set_achievement(Achievement::BeatSweeper12x12),
+                        (16, 16) => set_achievement(Achievement::BeatSweeper16x16),
+                        (28, 17) => set_achievement(Achievement::BeatSweeper28x17),
+                        _ => {}
+                    }
                     return Some(SceneAction::Win);
                 }
             }

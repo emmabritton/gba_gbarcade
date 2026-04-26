@@ -1,4 +1,5 @@
 use crate::gfx::background;
+use crate::progress::{Achievement, set_achievement};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -342,6 +343,7 @@ impl InvadersState {
 
     pub fn cheat(&mut self) {
         self.lives = self.lives.saturating_add(1).min(8);
+        set_achievement(Achievement::UsedCheatInvaders);
     }
 
     pub fn update(
@@ -546,6 +548,10 @@ impl InvadersState {
                             self.advance_timer = new_period;
                         }
                         if self.alive_count == 0 {
+                            set_achievement(Achievement::BeatInvaders);
+                            if self.lives == 3 {
+                                set_achievement(Achievement::BeatInvadersWithFullLives);
+                            }
                             return Some(SceneAction::Win);
                         }
                     }

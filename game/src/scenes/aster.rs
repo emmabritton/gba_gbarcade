@@ -1,5 +1,6 @@
 use crate::gfx::background;
 use crate::printer::WhiteVariWidthText;
+use crate::progress::{Achievement, set_achievement};
 use crate::rng::{next_i32, next_u16_in};
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -344,8 +345,9 @@ impl AsterState {
 impl AsterState {
     pub fn cheat(&mut self) {
         self.fast_fire = true;
+        set_achievement(Achievement::UsedCheatAsteroids);
     }
-    
+
     pub fn update(
         &mut self,
         button_controller: &mut ButtonController,
@@ -393,8 +395,17 @@ impl AsterState {
                 life: BULLET_LIFE,
                 active: true,
             };
-            let base = if self.fast_fire { FAST_FIRE_COOLDOWN } else { FIRE_COOLDOWN };
-            self.fire_cooldown = base + if button_controller.is_just_pressed(Button::A) { 0 } else { 2 };
+            let base = if self.fast_fire {
+                FAST_FIRE_COOLDOWN
+            } else {
+                FIRE_COOLDOWN
+            };
+            self.fire_cooldown = base
+                + if button_controller.is_just_pressed(Button::A) {
+                    0
+                } else {
+                    2
+                };
             sound_controller.play_sfx(SoundEffect::Place);
             self.add_popup(self.player_pos, SPRITE_SCORE_BULLET, SCORE_BULLET);
         }
@@ -570,6 +581,7 @@ impl AsterState {
         }
 
         if self.asteroids.iter().all(|a| !a.active) {
+            set_achievement(Achievement::BeatAsteroids);
             return Some(SceneAction::Win);
         }
 

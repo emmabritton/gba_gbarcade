@@ -1,5 +1,6 @@
 use crate::gfx::{ShowSprite, background};
 use crate::menu_cursor::MenuCursor;
+use crate::progress::{Achievement, set_achievement};
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
 use agb::display::tiled::{RegularBackground, RegularBackgroundSize, TileFormat};
@@ -147,10 +148,9 @@ impl LightsOutState {
 }
 
 impl LightsOutState {
-    pub fn cheat(
-        &mut self
-    ) {
+    pub fn cheat(&mut self) {
         self.grid.iter_mut().for_each(|v| *v = !*v);
+        set_achievement(Achievement::UsedCheatLightsOut);
     }
 
     pub fn update(
@@ -165,6 +165,12 @@ impl LightsOutState {
             self.toggle(idx);
             sound_controller.play_sfx(SoundEffect::Place);
             if self.is_solved() {
+                match self.grid_width {
+                    5 => set_achievement(Achievement::BeatLightsOut5x5),
+                    10 => set_achievement(Achievement::BeatLightsOut10x6),
+                    12 => set_achievement(Achievement::BeatLightsOut12x8),
+                    _ => {}
+                }
                 return Some(SceneAction::Win);
             }
         }

@@ -1,6 +1,7 @@
 use crate::direction::Direction;
 use crate::gfx::background_stack;
 use crate::printer::WhiteVariWidthText;
+use crate::progress::{Achievement, set_achievement};
 use crate::rng::next_u16_in;
 use crate::scenes::SceneAction;
 use crate::sound_controller::{SoundController, SoundEffect};
@@ -781,6 +782,7 @@ fn not_neighbours(center: (usize, usize), start: (usize, usize), end: (usize, us
 impl PipesState {
     pub fn cheat(&mut self) {
         self.flow = FlowPhase::Countdown(self.difficulty.fill_delay());
+        set_achievement(Achievement::UsedCheatPipe);
     }
 
     pub fn update(
@@ -869,6 +871,20 @@ impl PipesState {
                 } else {
                     if self.score > 0 {
                         self.clear_pipe_hint();
+                        match self.difficulty {
+                            PipeDifficulty::SmallEasy => {
+                                set_achievement(Achievement::BeatPipeSmallEasy)
+                            }
+                            PipeDifficulty::SmallHard => {
+                                set_achievement(Achievement::BeatPipeSmallHard)
+                            }
+                            PipeDifficulty::LargeEasy => {
+                                set_achievement(Achievement::BeatPipeLargeEasy)
+                            }
+                            PipeDifficulty::LargeHard => {
+                                set_achievement(Achievement::BeatPipeLargeHard)
+                            }
+                        }
                         return Some(SceneAction::Win);
                     } else {
                         return self.set_as_loss();

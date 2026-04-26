@@ -82,16 +82,16 @@ impl SceneKind {
             SceneKind::Blank(s) => s.show(frame),
         }
     }
-    
+
     fn cheat(&mut self) {
         match self {
             SceneKind::Menu(_) => {}
-            SceneKind::Pipes(s) =>s.cheat(),
-            SceneKind::Bricks(s) =>s.cheat(),
-            SceneKind::Aster(s) =>s.cheat(),
-            SceneKind::Sweeper(s) =>s.cheat(),
-            SceneKind::Invaders(s) =>s.cheat(),
-            SceneKind::LightsOut(s) =>s.cheat(),
+            SceneKind::Pipes(s) => s.cheat(),
+            SceneKind::Bricks(s) => s.cheat(),
+            SceneKind::Aster(s) => s.cheat(),
+            SceneKind::Sweeper(s) => s.cheat(),
+            SceneKind::Invaders(s) => s.cheat(),
+            SceneKind::LightsOut(s) => s.cheat(),
             SceneKind::Config(_) => {}
             SceneKind::Blank(_) => {}
         }
@@ -181,9 +181,11 @@ impl SceneHost {
             } else {
                 self.select_held_timer = 0;
                 if button_controller.is_pressed(Button::Select) {
-                    if self.cheat_state == 0 || self.cheat_state == 2 {
-                        if button_controller.is_just_pressed(Button::L) {
+                    if button_controller.is_just_pressed(Button::L) {
+                        if self.cheat_state == 0 || self.cheat_state == 2 {
                             self.cheat_state += 1;
+                        } else {
+                            self.cheat_state = 0;
                         }
                     } else if button_controller.is_just_pressed(Button::R) {
                         if self.cheat_state == 1 {
@@ -192,7 +194,9 @@ impl SceneHost {
                             self.kind.cheat();
                             sound_controller.play_sfx(SoundEffect::Cheat);
                             self.cheat_state = 0;
-                        } 
+                        } else {
+                            self.cheat_state = 0;
+                        }
                     }
                 } else {
                     self.cheat_state = 0;
@@ -205,7 +209,7 @@ impl SceneHost {
         } else {
             self.select_held_timer = 0;
         }
-        
+
         match self.kind.update(button_controller, sound_controller) {
             Some(SceneAction::Win) => {
                 self.game_result = GameHostState::new_win();
