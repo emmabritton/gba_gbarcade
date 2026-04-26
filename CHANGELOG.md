@@ -12,6 +12,7 @@
   - Minefield: reveal a mine
   - Invaders: gain an extra life 
   - Lights out: toggle all lights
+- Add helper value for achievements in EWRAM
 
 # 0.1.3
 
